@@ -15,7 +15,7 @@ const db = firebase.database();
 
 let currentUser = null, userProfile = {}, currentQuarter = 1, currentSubject = "Английский язык", currentTabId = "section", allGradesData = {}, saveDataTimeout;
 
-// --- ИСПРАВЛЕНИЕ ЗДЕСЬ: Оборачиваем назначение событий в DOMContentLoaded ---
+// --- ИСПРАВЛЕНИЕ: Оборачиваем весь код, работающий с DOM, в 'DOMContentLoaded' ---
 document.addEventListener('DOMContentLoaded', () => {
     const appContainer = document.getElementById('app-container');
     const authOverlay = document.getElementById('auth-overlay');
@@ -25,117 +25,127 @@ document.addEventListener('DOMContentLoaded', () => {
     const profileUsername = document.getElementById('profile-username');
     const profileClass = document.getElementById('profile-class');
 
+    // Мониторинг состояния аутентификации пользователя
     auth.onAuthStateChanged(user => {
-        if (user) { 
-            currentUser = user; 
-            authOverlay.classList.add('hidden'); 
-            appContainer.classList.remove('hidden'); 
-            loadUserData().then(() => { handleUrlParams(); }); 
-        } else { 
-            currentUser = null; 
-            if(userDisplayNameElement) userDisplayNameElement.textContent = ''; 
-            authOverlay.classList.remove('hidden'); 
-            appContainer.classList.add('hidden'); 
+        if (user) {
+            currentUser = user;
+            authOverlay.classList.add('hidden');
+            appContainer.classList.remove('hidden');
+            loadUserData().then(() => { handleUrlParams(); });
+        } else {
+            currentUser = null;
+            if(userDisplayNameElement) userDisplayNameElement.textContent = '';
+            authOverlay.classList.remove('hidden');
+            appContainer.classList.add('hidden');
         }
     });
 
-    document.getElementById('login-button').addEventListener('click', () => { 
-        const email = document.getElementById('login-email').value; 
-        const password = document.getElementById('login-password').value; 
-        document.getElementById('login-error').textContent = ''; 
-        auth.signInWithEmailAndPassword(email, password).catch(error => { 
-            document.getElementById('login-error').textContent = getFriendlyAuthError(error.code); 
-        }); 
+    // Обработчик кнопки "Войти"
+    document.getElementById('login-button').addEventListener('click', () => {
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        document.getElementById('login-error').textContent = '';
+        auth.signInWithEmailAndPassword(email, password).catch(error => {
+            document.getElementById('login-error').textContent = getFriendlyAuthError(error.code);
+        });
     });
 
-    document.getElementById('register-button').addEventListener('click', () => { 
-        const username = document.getElementById('register-username').value.trim(); 
-        const userClass = document.getElementById('register-class').value.trim(); 
-        const email = document.getElementById('register-email').value; 
-        const password = document.getElementById('register-password').value; 
-        const errorElement = document.getElementById('register-error'); 
-        errorElement.textContent = ''; 
-        if (username.length < 3 || username.length > 15 || !/^[a-zA-Z0-9]+$/.test(username)) { 
-            errorElement.textContent = 'Имя: 3-15 латинских букв и цифр.'; 
-            return; 
-        } 
-        if (!userClass) { 
-            errorElement.textContent = 'Пожалуйста, укажите ваш класс.'; 
-            return; 
-        } 
-        const usernameRef = db.ref(`usernames/${username.toLowerCase()}`); 
-        usernameRef.once('value').then(snapshot => { 
-            if (snapshot.exists()) { 
-                errorElement.textContent = 'Это имя пользователя уже занято.'; 
-            } else { 
-                auth.createUserWithEmailAndPassword(email, password).then(userCredential => { 
-                    const user = userCredential.user; 
-                    db.ref(`users/${user.uid}/profile`).set({ username: username, email: user.email, class: userClass, isPublic: true }); 
-                    usernameRef.set(user.uid); 
-                }).catch(error => { 
-                    errorElement.textContent = getFriendlyAuthError(error.code); 
-                }); 
-            } 
-        }); 
+    // Обработчик кнопки "Создать аккаунт"
+    document.getElementById('register-button').addEventListener('click', () => {
+        const username = document.getElementById('register-username').value.trim();
+        const userClass = document.getElementById('register-class').value.trim();
+        const email = document.getElementById('register-email').value;
+        const password = document.getElementById('register-password').value;
+        const errorElement = document.getElementById('register-error');
+        errorElement.textContent = '';
+        if (username.length < 3 || username.length > 15 || !/^[a-zA-Z0-9]+$/.test(username)) {
+            errorElement.textContent = 'Имя: 3-15 латинских букв и цифр.';
+            return;
+        }
+        if (!userClass) {
+            errorElement.textContent = 'Пожалуйста, укажите ваш класс.';
+            return;
+        }
+        const usernameRef = db.ref(`usernames/${username.toLowerCase()}`);
+        usernameRef.once('value').then(snapshot => {
+            if (snapshot.exists()) {
+                errorElement.textContent = 'Это имя пользователя уже занято.';
+            } else {
+                auth.createUserWithEmailAndPassword(email, password).then(userCredential => {
+                    const user = userCredential.user;
+                    db.ref(`users/${user.uid}/profile`).set({ username: username, email: user.email, class: userClass, isPublic: true });
+                    usernameRef.set(user.uid);
+                }).catch(error => {
+                    errorElement.textContent = getFriendlyAuthError(error.code);
+                });
+            }
+        });
     });
 
+    // Обработчики переключения форм и выхода
     document.getElementById('logout-btn').addEventListener('click', () => auth.signOut());
-    document.getElementById('show-register').addEventListener('click', () => { 
-        document.getElementById('login-section').classList.add('hidden'); 
-        document.getElementById('register-section').classList.remove('hidden'); 
+    document.getElementById('show-register').addEventListener('click', () => {
+        document.getElementById('login-section').classList.add('hidden');
+        document.getElementById('register-section').classList.remove('hidden');
     });
-    document.getElementById('show-login').addEventListener('click', () => { 
-        document.getElementById('register-section').classList.add('hidden'); 
-        document.getElementById('login-section').classList.remove('hidden'); 
+    document.getElementById('show-login').addEventListener('click', () => {
+        document.getElementById('register-section').classList.add('hidden');
+        document.getElementById('login-section').classList.remove('hidden');
     });
 
+    // Навигация по приложению
     const views = { profile: document.getElementById('profile-view'), grades: document.getElementById('grades-view'), stats: document.getElementById('stats-view'), users: document.getElementById('users-view') };
     const navButtons = { profile: document.getElementById('nav-profile'), grades: document.getElementById('nav-grades'), stats: document.getElementById('nav-stats'), users: document.getElementById('nav-users') };
     Object.keys(navButtons).forEach(key => navButtons[key].addEventListener('click', () => navigateTo(key)));
-    
+
+    // Настройки приватности
     privacyCheckbox.addEventListener('change', (e) => savePrivacySetting(e.target.checked));
     document.getElementById('profile-settings-btn').addEventListener('click', () => { document.getElementById('profile-settings-panel').classList.toggle('hidden'); });
 
-    document.getElementById('stats-q-selector').addEventListener('click', e => { 
-        if (e.target.classList.contains('q-btn')) { 
-            document.querySelector('#stats-q-selector .q-btn.active').classList.remove('active'); 
-            e.target.classList.add('active'); 
-            renderStatisticsView('stats-results-container', allGradesData); 
+    // Переключатель четвертей в статистике
+    document.getElementById('stats-q-selector').addEventListener('click', e => {
+        if (e.target.classList.contains('q-btn')) {
+            document.querySelector('#stats-q-selector .q-btn.active').classList.remove('active');
+            e.target.classList.add('active');
+            renderStatisticsView('stats-results-container', allGradesData);
         }
     });
 
-    document.getElementById('search-user-button').addEventListener('click', () => { 
-        const usernameToSearch = document.getElementById('search-username-input').value.trim(); 
-        searchAndDisplayUser(usernameToSearch); 
+    // Поиск пользователя
+    document.getElementById('search-user-button').addEventListener('click', () => {
+        const usernameToSearch = document.getElementById('search-username-input').value.trim();
+        searchAndDisplayUser(usernameToSearch);
     });
 
-    document.getElementById('profile-share-btn').addEventListener('click', () => { 
-        const shareUrl = `${window.location.origin}${window.location.pathname}?user=${userProfile.username}`; 
-        navigator.clipboard.writeText(shareUrl).then(() => { alert('Ссылка на профиль скопирована!'); }); 
+    // Поделиться профилем
+    document.getElementById('profile-share-btn').addEventListener('click', () => {
+        const shareUrl = `${window.location.origin}${window.location.pathname}?user=${userProfile.username}`;
+        navigator.clipboard.writeText(shareUrl).then(() => { alert('Ссылка на профиль скопирована!'); });
     });
 
-    const profileInfoDisplay = document.getElementById('profile-info-display'); 
-    const profileInfoEdit = document.getElementById('profile-info-edit'); 
-    const profileViewActions = document.getElementById('profile-view-actions'); 
-    const profileEditActions = document.getElementById('profile-edit-actions'); 
-    const editUsernameInput = document.getElementById('edit-username-input'); 
+    // Редактирование профиля
+    const profileInfoDisplay = document.getElementById('profile-info-display');
+    const profileInfoEdit = document.getElementById('profile-info-edit');
+    const profileViewActions = document.getElementById('profile-view-actions');
+    const profileEditActions = document.getElementById('profile-edit-actions');
+    const editUsernameInput = document.getElementById('edit-username-input');
     const editClassInput = document.getElementById('edit-class-input');
 
-    document.getElementById('profile-edit-btn').addEventListener('click', () => { 
-        profileInfoDisplay.classList.add('hidden'); 
-        profileViewActions.classList.add('hidden'); 
-        profileInfoEdit.classList.remove('hidden'); 
-        profileEditActions.classList.remove('hidden'); 
-        editUsernameInput.value = userProfile.username; 
-        editClassInput.value = userProfile.class; 
-        document.getElementById('edit-profile-error').textContent = ''; 
+    document.getElementById('profile-edit-btn').addEventListener('click', () => {
+        profileInfoDisplay.classList.add('hidden');
+        profileViewActions.classList.add('hidden');
+        profileInfoEdit.classList.remove('hidden');
+        profileEditActions.classList.remove('hidden');
+        editUsernameInput.value = userProfile.username;
+        editClassInput.value = userProfile.class;
+        document.getElementById('edit-profile-error').textContent = '';
     });
 
-    document.getElementById('profile-cancel-btn').addEventListener('click', () => { 
-        profileInfoEdit.classList.add('hidden'); 
-        profileEditActions.classList.add('hidden'); 
-        profileInfoDisplay.classList.remove('hidden'); 
-        profileViewActions.classList.remove('hidden'); 
+    document.getElementById('profile-cancel-btn').addEventListener('click', () => {
+        profileInfoEdit.classList.add('hidden');
+        profileEditActions.classList.add('hidden');
+        profileInfoDisplay.classList.remove('hidden');
+        profileViewActions.classList.remove('hidden');
     });
 
     document.getElementById('profile-save-btn').addEventListener('click', async () => {
@@ -182,30 +192,31 @@ document.addEventListener('DOMContentLoaded', () => {
             errorElement.textContent = 'Ошибка при обновлении имени: ' + err.message;
         });
     });
-
-    document.querySelector('#grades-view .quarter-selector').addEventListener('click', (e) => { 
-        if (e.target.classList.contains('q-btn')) { 
-            document.querySelector('#grades-view .quarter-selector .q-btn.active').classList.remove('active'); 
-            e.target.classList.add('active'); 
-            currentQuarter = parseInt(e.target.dataset.quarter, 10); 
-            if (!allGradesData[`q${currentQuarter}`]) { 
-                allGradesData[`q${currentQuarter}`] = getNewQuarterData(); 
-                saveData(); 
-            } 
-            renderApp(); 
-        } 
+    
+    // Обработчики в разделе "Мои Оценки"
+    document.querySelector('#grades-view .quarter-selector').addEventListener('click', (e) => {
+        if (e.target.classList.contains('q-btn')) {
+            document.querySelector('#grades-view .quarter-selector .q-btn.active').classList.remove('active');
+            e.target.classList.add('active');
+            currentQuarter = parseInt(e.target.dataset.quarter, 10);
+            if (!allGradesData[`q${currentQuarter}`]) {
+                allGradesData[`q${currentQuarter}`] = getNewQuarterData();
+                saveData();
+            }
+            renderApp();
+        }
     });
     
-    document.querySelector('#grades-view .tabs').addEventListener('click', e => { 
-        if (e.target.classList.contains('tab')) { 
-            document.querySelector('#grades-view .tabs .tab.active').classList.remove('active'); 
-            e.target.classList.add('active'); 
-            currentTabId = e.target.dataset.tabId; 
-            renderMainContent(); 
-        } 
+    document.querySelector('#grades-view .tabs').addEventListener('click', e => {
+        if (e.target.classList.contains('tab')) {
+            document.querySelector('#grades-view .tabs .tab.active').classList.remove('active');
+            e.target.classList.add('active');
+            currentTabId = e.target.dataset.tabId;
+            renderMainContent();
+        }
     });
 });
-// --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+// --- КОНЕЦ ОБЕРТКИ DOMContentLoaded ---
 
 
 function getNewQuarterData() {
