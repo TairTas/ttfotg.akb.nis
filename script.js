@@ -18,7 +18,7 @@ let currentUser = null, userProfile = {}, currentQuarter = 1, currentSubject = "
 
 // --- Глобальные переменные для ссылок на DOM элементы (инициализируются позже) ---
 let appContainer, authOverlay, userDisplayNameElement, myGradesSidebarBody, privacyCheckbox, profileUsername, profileClass;
-let views, navButtons; // Теперь эти тоже объявлены глобально
+let views, navButtons;
 
 // --- ОСНОВНОЙ КОД, КОТОРЫЙ ЗАПУСКАЕТСЯ ПОСЛЕ ЗАГРУЗКИ СТРАНИЦЫ ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -31,7 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
     profileUsername = document.getElementById('profile-username');
     profileClass = document.getElementById('profile-class');
     
-    // Инициализируем views и navButtons после того, как DOM элементы доступны
     views = {
         profile: document.getElementById('profile-view'),
         grades: document.getElementById('grades-view'),
@@ -109,7 +108,6 @@ function setupEventListeners() {
 
     document.getElementById('logout-btn').addEventListener('click', () => auth.signOut());
     
-    // Кнопки переключения между формами входа/регистрации
     document.getElementById('show-register').addEventListener('click', () => {
         document.getElementById('login-section').classList.add('hidden');
         document.getElementById('register-section').classList.remove('hidden');
@@ -234,32 +232,10 @@ function setupEventListeners() {
             renderMainContent();
         }
     });
-
-    // Обработчики для профиля друга (если есть)
-    // Эти элементы могут отсутствовать, если пользователь не на вкладке "Пользователи"
-    const friendStatsQSelector = document.getElementById('friend-stats-q-selector');
-    const friendGradesQSelector = document.getElementById('friend-grades-q-selector');
-    const friendTabs = document.getElementById('friend-tabs');
-
-    if (friendStatsQSelector) friendStatsQSelector.addEventListener('click', handleFriendQSelector);
-    if (friendGradesQSelector) friendGradesQSelector.addEventListener('click', handleFriendQSelector);
-    if (friendTabs) friendTabs.addEventListener('click', e => {
-        if (e.target.classList.contains('tab')) {
-            const activeTab = friendTabs.querySelector('.tab.active');
-            if(activeTab) activeTab.classList.remove('active');
-            e.target.classList.add('active');
-            // Здесь нужен вызов renderFriendGradesView, но без глобальных переменных fq, ft, fs это сложнее.
-            // Придется вызывать его через searchAndDisplayUser или переделать логику friendData.
-            // Для упрощения, можно просто вызвать renderFriendData с текущими данными,
-            // но это потребует сохранения состояния FQ, FT, FS.
-            // Сейчас это не вызывает прямую ошибку, но может не обновить контент.
-            // Оставляем как есть, так как это не причина текущей проблемы с кнопками.
-        }
-    });
 }
 
 
-// --- ВСЕ ОСТАЛЬНЫЕ ФУНКЦИИ (без изменений, кроме вызова `myGradesSidebarBody`) ---
+// --- ВСЕ ОСТАЛЬНЫЕ ФУНКЦИИ (без изменений) ---
 
 function getNewQuarterData() {
     return JSON.parse(JSON.stringify({
@@ -382,7 +358,7 @@ function handleUrlParams() { const params = new URLSearchParams(window.location.
 function getGradeFromPercentage(percentage) { if (percentage >= 85) return 5; if (percentage >= 65) return 4; if (percentage >= 40) return 3; return 2; }
 function calculateFinalPercentage(sorResult, sorMax, sochResult, sochMax) { let hasSors = sorMax > 0, hasSochs = sochMax > 0, finalPercentage = 0; if (hasSors && hasSochs) { finalPercentage = ((sorResult / sorMax) * 0.5 + (sochResult / sochMax) * 0.5) * 100; } else if (hasSors) { finalPercentage = (sorResult / sorMax) * 100; } else if (hasSochs) { finalPercentage = (sochResult / sochMax) * 100; } return finalPercentage; }
 function calculateFinalPercentageForFriend(subjectName, quarterData) { let sumSorResult = 0, sumSorMax = 0, sumSochResult = 0, sumSochMax = 0; if(quarterData && quarterData.section) { (quarterData.section[subjectName] || []).forEach(task => { const result = parseFloat(task.userResult); if (!isNaN(result)) { sumSorResult += result; sumSorMax += task.max; } }); } if(quarterData && quarterData.quarter) { (quarterData.quarter[subjectName] || []).forEach(task => { const result = parseFloat(task.userResult); if (!isNaN(result)) { sumSochResult += result; sumSochMax += task.max; } }); } return calculateFinalPercentage(sumSorResult, sumSorMax, sumSochResult, sumSochMax); }
-function calculateAndUpdateSubject(subjectName) { const finalPercentage = calculateFinalPercentageForFriend(subjectName, allGradesData[`q${currentQuarter}`]); const grade = getGradeFromPercentage(finalPercentage); const subjectRow = myGradesSidebarBody.querySelector(`tr[data-subject="${subjectName}"]`); if (subjectRow) { const percentageCell = subjectRow.querySelector('.subject-percentage'); const gradeCell = subjectRow.querySelector('.subject-grade'); if (finalPercentage > 0) { percentageCell.textContent = `${finalPercentage.toFixed(2)} %`; gradeCell.textContent = grade; } else { percentageCell.textContent = '-- %'; gradeCell.textContent = '-'; } } }
+function calculateAndUpdateSubject(subjectName) { const subjectRow = myGradesSidebarBody.querySelector(`tr[data-subject="${subjectName}"]`); if (!subjectRow) return; const finalPercentage = calculateFinalPercentageForFriend(subjectName, allGradesData[`q${currentQuarter}`]); const grade = getGradeFromPercentage(finalPercentage); const percentageCell = subjectRow.querySelector('.subject-percentage'); const gradeCell = subjectRow.querySelector('.subject-grade'); if (finalPercentage > 0) { percentageCell.textContent = `${finalPercentage.toFixed(2)} %`; gradeCell.textContent = grade; } else { percentageCell.textContent = '-- %'; gradeCell.textContent = '-'; } }
 function calculateRequiredScore(targetGrade, subjectName, currentTaskTab, currentTaskIndex) { const gradeTargets = { 5: 85, 4: 65, 3: 40 }; const targetPercentage = gradeTargets[targetGrade]; if (!targetPercentage) return 0; let otherSorResult = 0, otherSorMax = 0, otherSochResult = 0, otherSochMax = 0; const dataForQuarter = allGradesData[`q${currentQuarter}`]; (dataForQuarter.section[subjectName] || []).forEach((task, index) => { if (currentTaskTab === 'section' && index === currentTaskIndex) return; const result = parseFloat(task.userResult); if (!isNaN(result)) { otherSorResult += result; otherSorMax += task.max; } }); (dataForQuarter.quarter[subjectName] || []).forEach((task, index) => { if (currentTaskTab === 'quarter' && index === currentTaskIndex) return; const result = parseFloat(task.userResult); if (!isNaN(result)) { otherSochResult += result; otherSochMax += task.max; } }); const currentTask = dataForQuarter[currentTaskTab][subjectName][currentTaskIndex]; const maxForCurrent = currentTask.max; for (let x = 0; x <= maxForCurrent; x++) { let potentialSorResult = otherSorResult, potentialSorMax = otherSorMax, potentialSochResult = otherSochResult, potentialSochMax = otherSochMax; if (currentTaskTab === 'section') { potentialSorResult += x; potentialSorMax += maxForCurrent; } else { potentialSochResult += x; potentialSochMax += maxForCurrent; } const potentialFinalPercentage = calculateFinalPercentage(potentialSorResult, potentialSorMax, potentialSochResult, potentialSochMax); if (potentialFinalPercentage >= targetPercentage) return x; } return 0; }
 function handleInputChange(event) { const input = event.target; const subject = input.dataset.subject; const tab = input.dataset.tab; const index = parseInt(input.dataset.index, 10); const value = input.value; const dataForQuarter = allGradesData[`q${currentQuarter}`]; const match = value.match(/^%([345])$/); if (match) { const targetGrade = parseInt(match[1], 10); const requiredScore = calculateRequiredScore(targetGrade, subject, tab, index); input.value = requiredScore; dataForQuarter[tab][subject][index].userResult = requiredScore; } else { let numericValue = parseFloat(value); const max = dataForQuarter[tab][subject][index].max; if (numericValue > max) { numericValue = max; input.value = max; } if (numericValue < 0) { numericValue = 0; input.value = 0; } dataForQuarter[tab][subject][index].userResult = isNaN(numericValue) ? "" : numericValue; } calculateAndUpdateSubject(subject); saveData(); }
 function renderMainContent() { const contentDisplay = document.getElementById('content-display'); const dataForQuarter = allGradesData[`q${currentQuarter}`]; if (!dataForQuarter) { contentDisplay.innerHTML = `<div class="no-data-message">Данные для этой четверти еще не созданы.</div>`; return; } const data = dataForQuarter[currentTabId]?.[currentSubject]; let tableHTML = `<table><thead><tr><th></th><th>Наименование</th><th>Результат</th><th>Максимум</th></tr></thead><tbody>`; if (!data || data.length === 0) { contentDisplay.innerHTML = `<div class="no-data-message">Данные отсутствуют.</div>`; return; } data.forEach((item, index) => { tableHTML += `<tr><td>${index + 1}</td><td>${item.name}</td><td><input type="text" value="${item.userResult || ''}" data-subject="${currentSubject}" data-tab="${currentTabId}" data-index="${index}"></td><td class="max-col">${item.max}</td></tr>`; }); tableHTML += `</tbody></table>`; contentDisplay.innerHTML = tableHTML; contentDisplay.querySelectorAll('input').forEach(input => { input.addEventListener('change', handleInputChange); }); }
@@ -396,5 +372,7 @@ function renderFriendData(friendData, container) {
     const handleFriendQSelector = (e) => { if (e.target.classList.contains('q-btn')) { fq = parseInt(e.target.dataset.quarter, 10); friendStatsQSelector.querySelector('.active').classList.remove('active'); friendGradesQSelector.querySelector('.active').classList.remove('active'); friendStatsQSelector.children[fq-1].classList.add('active'); friendGradesQSelector.children[fq-1].classList.add('active'); renderFriendDataViews(); }};
     friendStatsQSelector.addEventListener('click', handleFriendQSelector); friendGradesQSelector.addEventListener('click', handleFriendQSelector);
     friendTabs.addEventListener('click', e => { if (e.target.classList.contains('tab')) { friendTabs.querySelector('.active').classList.remove('active'); e.target.classList.add('active'); ft = e.target.dataset.tabId; renderFriendGradesView(); }});
+    renderFriendDataViews();
+}.target.dataset.tabId; renderFriendGradesView(); }});
     renderFriendDataViews();
 }
