@@ -44,10 +44,10 @@ tbody tr:last-child td { border-bottom: none; }
 .button:hover { background-color: #0069d9; }
 .button.secondary { background-color: #6c757d; }
 .button.secondary:hover { background-color: #5a6268; }
-.profile-header { position: relative; display: flex; justify-content: space-between; align-items: flex-start; }
+.profile-header { position: relative; display: flex; justify-content: flex-start; align-items: center; gap: 20px; }
 #profile-info-edit { display: flex; flex-direction: column; gap: 10px; }
 #profile-info-edit input { width: 200px; text-align: left; }
-.profile-actions { display: flex; gap: 5px; }
+.profile-actions { display: flex; gap: 5px; margin-left: auto; }
 .profile-header h2, .profile-header p { margin: 0; }
 .profile-header p { color: var(--text-muted); }
 .icon-btn { width: 36px; height: 36px; padding: 6px; border: none; background: transparent; border-radius: 50%; cursor: pointer; color: var(--text-muted); transition: background-color 0.2s; }
@@ -80,90 +80,62 @@ input:checked + .slider:before { transform: translateX(22px); }
 .stat-item span { font-weight: normal; color: var(--text-color); text-align: right; padding-left: 10px; }
 .stat-item strong { color: var(--text-muted); white-space: nowrap; }
 
-/* === Responsive Design for Mobile === */
 @media (max-width: 768px) {
-    /* Общие отступы */
     #app-container { padding: 0 10px; }
     #app-header { padding-right: 10px; padding-left: 10px;}
-
-    /* Главная навигация */
-    .main-nav {
-        overflow-x: auto;
-        white-space: nowrap;
-        justify-content: flex-start;
-        -ms-overflow-style: none;  /* IE and Edge */
-        scrollbar-width: none;  /* Firefox */
-    }
-    .main-nav::-webkit-scrollbar {
-        display: none; /* Chrome, Safari, Opera */
-    }
-
-    /* Карточки контента */
-    .content-card {
-        padding: 15px;
-    }
-
-    /* "Мои Оценки" и профиль друга: стек блоков */
-    .content-card.wide {
-        flex-direction: column;
-        padding: 0;
-    }
-    .content-card.wide .sidebar, 
-    .content-card.wide .main-content {
-        width: 100%;
-        padding: 15px;
-        box-sizing: border-box;
-    }
-    .content-card.wide .sidebar {
-        border-right: none;
-        border-bottom: 1px solid var(--border-color);
-    }
-
-    /* "Мой профиль": стек виджетов */
-    .profile-dashboard-layout {
-        grid-template-columns: 1fr;
-        gap: 15px;
-    }
-    .profile-header {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 15px;
-    }
-    #profile-info-edit input {
-        width: calc(100% - 18px);
-    }
-    .profile-actions {
-        align-self: flex-end;
-    }
-
-    /* "Пользователи": форма поиска */
-    #friends-search-section {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
-    }
-
-    /* Модальное окно входа */
-    #auth-modal {
-        width: 90%;
-        max-width: 340px;
-        padding: 20px;
-    }
-
-    /* Уменьшаем таблицу и шрифт */
-    table {
-        font-size: 14px;
-    }
-    th, td {
-        padding: 10px;
-    }
-    .main-content input {
-        width: 50px;
-        padding: 6px;
-    }
-    
-    /* Детали статистики */
-    .stats-details {
-        font-size: 0.95em;
-    }
+    .main-nav { overflow-x: auto; white-space: nowrap; justify-content: flex-start; -ms-overflow-style: none; scrollbar-width: none; }
+    .main-nav::-webkit-scrollbar { display: none; }
+    .content-card { padding: 15px; }
+    .content-card.wide { flex-direction: column; padding: 0; }
+    .content-card.wide .sidebar, .content-card.wide .main-content { width: 100%; padding: 15px; box-sizing: border-box; }
+    .content-card.wide .sidebar { border-right: none; border-bottom: 1px solid var(--border-color); }
+    .profile-dashboard-layout { grid-template-columns: 1fr; gap: 15px; }
+    .profile-header { flex-direction: column; align-items: stretch; gap: 15px; }
+    #profile-info-edit input { width: calc(100% - 18px); }
+    .profile-actions { align-self: flex-end; }
+    #friends-search-section { flex-direction: column; align-items: stretch; gap: 10px; }
+    #auth-modal { width: 90%; max-width: 340px; padding: 20px; }
+    table { font-size: 14px; }
+    th, td { padding: 10px; }
+    .main-content input { width: 50px; padding: 6px; }
+    .stats-details { font-size: 0.95em; }
 }
+
+#leaderboard-sort-controls { margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+.leaderboard-table .rank-col { width: 50px; text-align: center; font-weight: bold; }
+.leaderboard-table .number-col { text-align: center; font-weight: bold; }
+
+#post-creation-form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 25px; }
+#post-text-input { width: calc(100% - 20px); min-height: 80px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-family: inherit; font-size: 16px; resize: vertical; }
+#post-options { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+#post-options label { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-muted); cursor: pointer; }
+#posts-container { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
+.post-card { background-color: var(--card-background); border-radius: 8px; padding: 15px 20px; box-shadow: var(--shadow); position: relative; }
+.post-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.post-author-info { display: flex; flex-direction: column; }
+.post-author { font-weight: 600; }
+.post-author.anonymous { font-style: italic; color: var(--text-muted); }
+.post-timestamp { font-size: 13px; color: var(--text-muted); }
+.post-body { white-space: pre-wrap; word-wrap: break-word; }
+.post-delete-btn { position: absolute; top: 5px; right: 5px; width: 28px; height: 28px; border: none; background: transparent; cursor: pointer; color: var(--text-muted); border-radius: 50%; font-size: 20px; line-height: 28px; text-align: center; transition: background-color 0.2s, color 0.2s; }
+.post-delete-btn:hover { background-color: #f1f1f1; color: #dc3545; }
+
+#profile-picture-container { width: 100px; height: 100px; border-radius: 50%; border: 3px solid var(--border-color); position: relative; cursor: pointer; overflow: hidden; flex-shrink: 0; }
+#profile-picture-img { width: 100%; height: 100%; object-fit: cover; }
+#profile-picture-edit-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.4); color: white; display: flex; justify-content: center; align-items: center; font-size: 36px; opacity: 0; transition: opacity 0.2s ease; }
+#profile-picture-container:hover #profile-picture-edit-overlay { opacity: 1; }
+#profile-picture-container.loading::after, #submit-post-btn.loading { content: '...'; position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: rgba(255, 255, 255, 0.7); font-size: 24px; font-weight: bold; }
+#submit-post-btn.loading { color: transparent; }
+
+.post-author.clickable-username { cursor: pointer; text-decoration: underline; text-decoration-color: transparent; transition: text-decoration-color 0.2s; }
+.post-author.clickable-username:hover { text-decoration-color: var(--primary-color); }
+
+.post-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.post-image { max-width: 100%; border-radius: 8px; margin-top: 10px; }
+
+#post-image-preview-container { position: relative; width: 100px; margin-bottom: 10px; }
+#post-image-preview { width: 100%; height: auto; border-radius: 6px; }
+#remove-post-image-btn { position: absolute; top: -5px; right: -5px; width: 22px; height: 22px; background: #333; color: white; border: none; border-radius: 50%; cursor: pointer; font-size: 14px; line-height: 22px; }
+
+.friend-profile-header { display: flex; align-items: center; gap: 15px; }
+.friend-profile-header img { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; }
