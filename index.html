@@ -10,7 +10,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-    <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 
@@ -52,12 +51,22 @@
             <button id="nav-grades" class="main-nav-btn">Мои Оценки</button>
             <button id="nav-stats" class="main-nav-btn">Статистика</button>
             <button id="nav-users" class="main-nav-btn">Пользователи</button>
+            <button id="nav-leaderboard" class="main-nav-btn">Лидерборд</button>
+            <button id="nav-chat" class="main-nav-btn">Чат</button>
         </nav>
         
         <main id="app-main">
             <div id="profile-view">
                 <div class="content-card">
                     <div class="profile-header">
+                        <div id="profile-picture-container" title="Нажмите, чтобы изменить фото">
+                            <img id="profile-picture-img" src="https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png" alt="Фото профиля">
+                            <div id="profile-picture-edit-overlay">
+                                <span>+</span>
+                            </div>
+                        </div>
+                        <input type="file" id="profile-picture-input" class="hidden" accept="image/*">
+
                         <div id="profile-info-display">
                             <h2 id="profile-username"></h2>
                             <p id="profile-class"></p>
@@ -116,6 +125,45 @@
 
             <div id="users-view" class="hidden">
                 <div class="content-card"><div id="friends-search-section"><h3>Поиск пользователя</h3><input type="text" id="search-username-input" placeholder="Введите точное имя пользователя"><button id="search-user-button" class="button">Найти</button></div><div id="friend-results-container"></div></div>
+            </div>
+            
+            <div id="leaderboard-view" class="hidden">
+                <div class="content-card">
+                    <h3>Лидерборд</h3>
+                    <div id="leaderboard-sort-controls">
+                        <span>Сортировать по: </span>
+                        <button data-sort="percentage" class="button active">Среднему %</button>
+                        <button data-sort="grade" class="button secondary">Средней оценке</button>
+                    </div>
+                    <div id="leaderboard-table-container">
+                        <p>Загрузка данных...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="chat-view" class="hidden">
+                <div class="content-card">
+                    <h3>Общий чат</h3>
+                    <div id="post-creation-form">
+                        <textarea id="post-text-input" placeholder="Что у вас нового?" maxlength="280"></textarea>
+                        
+                        <div id="post-image-preview-container" class="hidden">
+                            <img id="post-image-preview" src="#" alt="Предпросмотр фото">
+                            <button id="remove-post-image-btn">&times;</button>
+                        </div>
+                        
+                        <input type="file" id="post-image-input" class="hidden" accept="image/*">
+                        
+                        <div id="post-options">
+                            <button id="attach-photo-btn" class="button secondary">Прикрепить фото</button>
+                            <label><input type="checkbox" id="post-anonymous-checkbox"> Отправить анонимно</label>
+                            <button id="submit-post-btn" class="button">Опубликовать</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="posts-container">
+                    <!-- Посты будут загружаться сюда -->
+                </div>
             </div>
         </main>
     </div>
