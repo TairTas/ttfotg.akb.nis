@@ -52,6 +52,7 @@
             <button id="nav-users" class="main-nav-btn">Пользователи</button>
             <button id="nav-leaderboard" class="main-nav-btn">Лидерборд</button>
             <button id="nav-chat" class="main-nav-btn">Чат</button>
+            <button id="nav-admin" class="main-nav-btn hidden">Админ Панель</button>
         </nav>
         
         <main id="app-main">
@@ -169,6 +170,20 @@
                     <!-- Посты будут загружаться сюда -->
                 </div>
             </div>
+
+            <div id="admin-panel-view" class="hidden">
+                <div class="content-card">
+                    <h3>Админ Панель</h3>
+                    <div class="admin-tabs">
+                        <div id="admin-tab-users" class="admin-tab active" data-tab="users">Пользователи</div>
+                        <div id="admin-tab-posts" class="admin-tab" data-tab="posts">Посты</div>
+                    </div>
+                    <div id="admin-content-container">
+                        <!-- Контент для вкладок будет загружаться сюда -->
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
