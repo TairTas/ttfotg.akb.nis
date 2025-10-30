@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Облачный Калькулятор Оценок</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+</head>
+<body>
+
+    <div id="auth-overlay">
+        <div id="auth-modal">
+            <div id="login-section">
+                <h3>Вход в систему</h3>
+                <div class="auth-form">
+                    <input type="email" id="login-email" placeholder="Email">
+                    <input type="password" id="login-password" placeholder="Пароль">
+                    <p id="login-error" class="auth-error-msg"></p>
+                    <button id="login-button" class="button">Войти</button>
+                </div>
+                <div class="auth-toggle">Нет аккаунта? <span id="show-register">Зарегистрироваться</span></div>
+            </div>
+            <div id="register-section" class="hidden">
+                <h3>Регистрация</h3>
+                <div class="auth-form">
+                    <input type="text" id="register-username" placeholder="Имя пользователя (3-15 симв.)">
+                    <input type="text" id="register-class" placeholder="Класс (например, 7A)">
+                    <input type="email" id="register-email" placeholder="Email">
+                    <input type="password" id="register-password" placeholder="Пароль (мин. 6 симв.)">
+                    <p id="register-error" class="auth-error-msg"></p>
+                    <button id="register-button" class="button">Создать аккаунт</button>
+                </div>
+                <div class="auth-toggle">Уже есть аккаунт? <span id="show-login">Войти</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-container" class="hidden">
+        <header id="app-header">
+            <span id="user-display-name"></span>
+            <span id="logout-btn">Выйти</span>
+        </header>
+
+        <nav class="main-nav">
+            <button id="nav-profile" class="main-nav-btn active">Мой Профиль</button>
+            <button id="nav-grades" class="main-nav-btn">Мои Оценки</button>
+            <button id="nav-stats" class="main-nav-btn">Статистика</button>
+            <button id="nav-users" class="main-nav-btn">Пользователи</button>
+        </nav>
+        
+        <main id="app-main">
+            <!-- View 1: My Profile -->
+            <div id="profile-view">
+                <div class="content-card">
+                    <div class="profile-header">
+                        <div id="profile-info-display">
+                            <h2 id="profile-username"></h2>
+                            <p id="profile-class"></p>
+                        </div>
+                        <div id="profile-info-edit" class="hidden">
+                             <input type="text" id="edit-username-input" placeholder="Имя пользователя">
+                             <input type="text" id="edit-class-input" placeholder="Класс">
+                             <p id="edit-profile-error" class="auth-error-msg"></p>
+                        </div>
+                        <div class="profile-actions">
+                             <div id="profile-view-actions">
+                                <button id="profile-share-btn" class="icon-btn" title="Поделиться профилем"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M18,16.08c-0.76,0-1.44,0.3-1.96,0.77L8.91,12.7c0.05-0.23,0.09-0.46,0.09-0.7s-0.04-0.47-0.09-0.7l7.05-4.11 c0.54,0.5,1.25,0.81,2.04,0.81c1.66,0,3-1.34,3-3s-1.34-3-3-3s-3,1.34-3,3c0,0.24,0.04,0.47,0.09,0.7L8.04,9.81 C7.5,9.31,6.79,9,6,9c-1.66,0-3,1.34-3,3s1.34,3,3,3c0.79,0,1.5-0.31,2.04-0.81l7.12,4.16c-0.05,0.21-0.08,0.43-0.08,0.65 c0,1.66,1.34,3,3,3s3-1.34,3-3S19.66,16.08,18,16.08z"/></svg></button>
+                                <button id="profile-edit-btn" class="icon-btn" title="Редактировать профиль"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M3,17.25V21h3.75L17.81,9.94l-3.75-3.75L3,17.25z M20.71,7.04c0.39-0.39,0.39-1.02,0-1.41l-2.34-2.34 c-0.39-0.39-1.02-0.39-1.41,0l-1.83,1.83l3.75,3.75L20.71,7.04z"/></svg></button>
+                                <button id="profile-settings-btn" class="icon-btn" title="Настройки приватности"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.44,0.17-0.48,0.41L9.22,5.72C8.63,5.96,8.1,6.29,7.6,6.67L5.21,5.71C4.99,5.62,4.74,5.69,4.62,5.92L2.7,9.24 c-0.11,0.2-0.06,0.47,0.12,0.61L4.85,11c-0.04,0.3-0.06,0.61-0.06,0.94c0,0.32,0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.38,2.91 c0.04,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44,0.17-0.48,0.41l0.38-2.91c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0.01,0.59-0.22l1.92-3.32c0.11-0.2,0.06-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg></button>
+                             </div>
+                             <div id="profile-edit-actions" class="hidden">
+                                <button id="profile-save-btn" class="button">Сохранить</button>
+                                <button id="profile-cancel-btn" class="button secondary">Отмена</button>
+                             </div>
+                        </div>
+                        <div id="profile-settings-panel" class="settings-panel hidden">
+                             <div class="setting-item"><label class="privacy-toggle"><input type="checkbox" id="privacy-checkbox"><span class="slider"></span></label><span>Сделать профиль публичным</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-dashboard-layout">
+                    <div class="content-card">
+                        <h3>Статистика за текущую четверть</h3>
+                        <div id="profile-stats-container" class="stats-results-container"></div>
+                    </div>
+                    <div class="content-card">
+                        <h3>Итоговые оценки за текущую четверть</h3>
+                        <div id="profile-grades-summary-container">
+                            <table>
+                                <thead>
+                                    <tr><th></th><th>Предмет</th><th>Общий %</th><th>Оценка</th></tr>
+                                </thead>
+                                <tbody id="profile-grades-summary-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="grades-view" class="hidden">
+                <div class="content-card wide">
+                     <div class="sidebar"><table><thead><tr><th></th><th>Предмет</th><th>Общий %</th><th>Оценка</th></tr></thead><tbody id="my-grades-sidebar-body"></tbody></table></div>
+                    <div class="main-content"><div class="quarter-selector"><button class="q-btn active" data-quarter="1">1</button><button class="q-btn" data-quarter="2">2</button><button class="q-btn" data-quarter="3">3</button><button class="q-btn" data-quarter="4">4</button></div><div class="tabs"><div class="tab active" data-tab-id="section">СОР</div><div class="tab" data-tab-id="quarter">СОЧ</div></div><div id="content-display"></div></div>
+                </div>
+            </div>
+
+            <div id="stats-view" class="hidden">
+                 <div class="content-card"><h3>Статистика за четверть</h3><div class="quarter-selector" id="stats-q-selector"><button class="q-btn active" data-quarter="1">1</button><button class="q-btn" data-quarter="2">2</button><button class="q-btn" data-quarter="3">3</button><button class="q-btn" data-quarter="4">4</button></div><div id="stats-results-container" class="stats-results-container"></div></div>
+            </div>
+
+            <div id="users-view" class="hidden">
+                <div class="content-card"><div id="friends-search-section"><h3>Поиск пользователя</h3><input type="text" id="search-username-input" placeholder="Введите точное имя пользователя"><button id="search-user-button" class="button">Найти</button></div><div id="friend-results-container"></div></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
