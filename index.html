@@ -9,7 +9,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
 </head>
 <body>
 
@@ -130,10 +129,15 @@
             <div id="leaderboard-view" class="hidden">
                 <div class="content-card">
                     <h3>Лидерборд</h3>
-                    <div id="leaderboard-sort-controls">
-                        <span>Сортировать по: </span>
-                        <button data-sort="percentage" class="button active">Среднему %</button>
-                        <button data-sort="grade" class="button secondary">Средней оценке</button>
+                    <div class="leaderboard-controls">
+                        <div id="leaderboard-sort-controls">
+                            <span>Сортировать по: </span>
+                            <button data-sort="percentage" class="button active">Среднему %</button>
+                            <button data-sort="grade" class="button secondary">Средней оценке</button>
+                        </div>
+                        <div id="leaderboard-filter-controls">
+                            <label><input type="checkbox" id="leaderboard-filter-complete"> Показать только заполнивших все оценки</label>
+                        </div>
                     </div>
                     <div id="leaderboard-table-container">
                         <p>Загрузка данных...</p>
