@@ -1,3 +1,7 @@
+import { inject } from 'https://esm.sh/@vercel/analytics';
+
+inject();
+
 // ВАШИ УЧЕТНЫЕ ДАННЫЕ FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyDIEydSnMe0r2xvqTo63N9DN676_DsNn0o",
@@ -257,4 +261,5 @@ function renderFriendData(friendData, container) {
     friendStatsQSelector.addEventListener('click', handleFriendQSelector); friendGradesQSelector.addEventListener('click', handleFriendQSelector);
     friendTabs.addEventListener('click', e => { if (e.target.classList.contains('tab')) { friendTabs.querySelector('.active').classList.remove('active'); e.target.classList.add('active'); ft = e.target.dataset.tabId; renderFriendGradesView(); }});
     renderFriendDataViews();
+
 }
