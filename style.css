@@ -141,3 +141,18 @@ input:checked + .slider:before { transform: translateX(22px); }
     
     .leaderboard-controls { flex-direction: column; align-items: flex-start; }
 }
+
+/* --- ДОБАВЛЕНО ДЛЯ АДМИН ПАНЕЛИ --- */
+.admin-tabs { display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 20px; }
+.admin-tab { padding: 10px 15px; cursor: pointer; border-radius: 6px 6px 0 0; border: 1px solid transparent; border-bottom: none; margin-right: 5px; color: var(--text-muted); font-weight: 500; }
+.admin-tab.active { background-color: var(--light-primary); border-color: var(--border-color); color: var(--primary-color); }
+.admin-user-card, .admin-post-card { background: var(--card-background); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
+.admin-user-info { display: flex; align-items: center; gap: 15px; }
+.admin-user-info img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; }
+.admin-user-details p { margin: 0; }
+.admin-user-actions, .admin-edit-actions { display: flex; gap: 10px; margin-top: 10px; }
+.admin-user-card input { padding: 8px; border: 1px solid var(--border-color); border-radius: 6px; }
+.admin-grade-editor-container { margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px; }
+.admin-post-author-reveal { font-size: 0.9em; color: #dc3545; font-style: italic; }
+.admin-user-details .email-info { font-size: 0.9em; color: var(--text-muted); }
+.admin-user-details .password-warning { font-size: 0.9em; color: #ffc107; font-weight: 500; }
