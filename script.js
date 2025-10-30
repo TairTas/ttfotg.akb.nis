@@ -1,7 +1,3 @@
-import { inject } from 'https://esm.sh/@vercel/analytics';
-
-inject();
-
 // ВАШИ УЧЕТНЫЕ ДАННЫЕ FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyDIEydSnMe0r2xvqTo63N9DN676_DsNn0o",
@@ -263,3 +259,4 @@ function renderFriendData(friendData, container) {
     renderFriendDataViews();
 
 }
+
