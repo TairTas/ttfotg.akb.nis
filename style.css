@@ -79,3 +79,91 @@ input:checked + .slider:before { transform: translateX(22px); }
 .stat-item { display: flex; justify-content: space-between; padding: 6px 0; font-size: 1em; }
 .stat-item span { font-weight: normal; color: var(--text-color); text-align: right; padding-left: 10px; }
 .stat-item strong { color: var(--text-muted); white-space: nowrap; }
+
+/* === Responsive Design for Mobile === */
+@media (max-width: 768px) {
+    /* Общие отступы */
+    #app-container { padding: 0 10px; }
+    #app-header { padding-right: 10px; padding-left: 10px;}
+
+    /* Главная навигация */
+    .main-nav {
+        overflow-x: auto;
+        white-space: nowrap;
+        justify-content: flex-start;
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
+    .main-nav::-webkit-scrollbar {
+        display: none; /* Chrome, Safari, Opera */
+    }
+
+    /* Карточки контента */
+    .content-card {
+        padding: 15px;
+    }
+
+    /* "Мои Оценки" и профиль друга: стек блоков */
+    .content-card.wide {
+        flex-direction: column;
+        padding: 0;
+    }
+    .content-card.wide .sidebar, 
+    .content-card.wide .main-content {
+        width: 100%;
+        padding: 15px;
+        box-sizing: border-box;
+    }
+    .content-card.wide .sidebar {
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    /* "Мой профиль": стек виджетов */
+    .profile-dashboard-layout {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    .profile-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 15px;
+    }
+    #profile-info-edit input {
+        width: calc(100% - 18px);
+    }
+    .profile-actions {
+        align-self: flex-end;
+    }
+
+    /* "Пользователи": форма поиска */
+    #friends-search-section {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    /* Модальное окно входа */
+    #auth-modal {
+        width: 90%;
+        max-width: 340px;
+        padding: 20px;
+    }
+
+    /* Уменьшаем таблицу и шрифт */
+    table {
+        font-size: 14px;
+    }
+    th, td {
+        padding: 10px;
+    }
+    .main-content input {
+        width: 50px;
+        padding: 6px;
+    }
+    
+    /* Детали статистики */
+    .stats-details {
+        font-size: 0.95em;
+    }
+}
