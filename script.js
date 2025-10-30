@@ -12,20 +12,19 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.database();
+// Firebase Storage больше не используется
 
 let currentUser = null, userProfile = {}, currentQuarter = 1, currentSubject = "Английский язык", currentTabId = "section", allGradesData = {}, saveDataTimeout;
+let currentLeaderboardSort = 'percentage';
 
-// --- ИСПРАВЛЕНИЕ: Оборачиваем весь код, работающий с DOM, в 'DOMContentLoaded' ---
 document.addEventListener('DOMContentLoaded', () => {
     const appContainer = document.getElementById('app-container');
     const authOverlay = document.getElementById('auth-overlay');
     const userDisplayNameElement = document.getElementById('user-display-name');
-    const myGradesSidebarBody = document.getElementById('my-grades-sidebar-body');
-    const privacyCheckbox = document.getElementById('privacy-checkbox');
-    const profileUsername = document.getElementById('profile-username');
-    const profileClass = document.getElementById('profile-class');
-
-    // Мониторинг состояния аутентификации пользователя
+    const profilePictureContainer = document.getElementById('profile-picture-container');
+    const profilePictureInput = document.getElementById('profile-picture-input');
+    const postsContainer = document.getElementById('posts-container');
+    
     auth.onAuthStateChanged(user => {
         if (user) {
             currentUser = user;
@@ -40,7 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Обработчик кнопки "Войти"
     document.getElementById('login-button').addEventListener('click', () => {
         const email = document.getElementById('login-email').value;
         const password = document.getElementById('login-password').value;
@@ -50,7 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Обработчик кнопки "Создать аккаунт"
     document.getElementById('register-button').addEventListener('click', () => {
         const username = document.getElementById('register-username').value.trim();
         const userClass = document.getElementById('register-class').value.trim();
@@ -59,12 +56,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const errorElement = document.getElementById('register-error');
         errorElement.textContent = '';
         if (username.length < 3 || username.length > 15 || !/^[a-zA-Z0-9]+$/.test(username)) {
-            errorElement.textContent = 'Имя: 3-15 латинских букв и цифр.';
-            return;
+            errorElement.textContent = 'Имя: 3-15 латинских букв и цифр.'; return;
         }
         if (!userClass) {
-            errorElement.textContent = 'Пожалуйста, укажите ваш класс.';
-            return;
+            errorElement.textContent = 'Пожалуйста, укажите ваш класс.'; return;
         }
         const usernameRef = db.ref(`usernames/${username.toLowerCase()}`);
         usernameRef.once('value').then(snapshot => {
@@ -82,7 +77,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Обработчики переключения форм и выхода
     document.getElementById('logout-btn').addEventListener('click', () => auth.signOut());
     document.getElementById('show-register').addEventListener('click', () => {
         document.getElementById('login-section').classList.add('hidden');
@@ -93,16 +87,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('login-section').classList.remove('hidden');
     });
 
-    // Навигация по приложению
-    const views = { profile: document.getElementById('profile-view'), grades: document.getElementById('grades-view'), stats: document.getElementById('stats-view'), users: document.getElementById('users-view') };
-    const navButtons = { profile: document.getElementById('nav-profile'), grades: document.getElementById('nav-grades'), stats: document.getElementById('nav-stats'), users: document.getElementById('nav-users') };
+    const views = { profile: document.getElementById('profile-view'), grades: document.getElementById('grades-view'), stats: document.getElementById('stats-view'), users: document.getElementById('users-view'), leaderboard: document.getElementById('leaderboard-view'), chat: document.getElementById('chat-view') };
+    const navButtons = { profile: document.getElementById('nav-profile'), grades: document.getElementById('nav-grades'), stats: document.getElementById('nav-stats'), users: document.getElementById('nav-users'), leaderboard: document.getElementById('nav-leaderboard'), chat: document.getElementById('nav-chat') };
     Object.keys(navButtons).forEach(key => navButtons[key].addEventListener('click', () => navigateTo(key)));
-
-    // Настройки приватности
-    privacyCheckbox.addEventListener('change', (e) => savePrivacySetting(e.target.checked));
+    
+    document.getElementById('privacy-checkbox').addEventListener('change', (e) => savePrivacySetting(e.target.checked));
     document.getElementById('profile-settings-btn').addEventListener('click', () => { document.getElementById('profile-settings-panel').classList.toggle('hidden'); });
 
-    // Переключатель четвертей в статистике
     document.getElementById('stats-q-selector').addEventListener('click', e => {
         if (e.target.classList.contains('q-btn')) {
             document.querySelector('#stats-q-selector .q-btn.active').classList.remove('active');
@@ -111,19 +102,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Поиск пользователя
     document.getElementById('search-user-button').addEventListener('click', () => {
         const usernameToSearch = document.getElementById('search-username-input').value.trim();
         searchAndDisplayUser(usernameToSearch);
     });
 
-    // Поделиться профилем
     document.getElementById('profile-share-btn').addEventListener('click', () => {
         const shareUrl = `${window.location.origin}${window.location.pathname}?user=${userProfile.username}`;
         navigator.clipboard.writeText(shareUrl).then(() => { alert('Ссылка на профиль скопирована!'); });
     });
 
-    // Редактирование профиля
     const profileInfoDisplay = document.getElementById('profile-info-display');
     const profileInfoEdit = document.getElementById('profile-info-edit');
     const profileViewActions = document.getElementById('profile-view-actions');
@@ -154,12 +142,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const errorElement = document.getElementById('edit-profile-error');
         errorElement.textContent = '';
         if (newUsername.length < 3 || newUsername.length > 15 || !/^[a-zA-Z0-9]+$/.test(newUsername)) {
-            errorElement.textContent = 'Имя: 3-15 латинских букв и цифр.';
-            return;
+            errorElement.textContent = 'Имя: 3-15 латинских букв и цифр.'; return;
         }
         if (!newClass) {
-            errorElement.textContent = 'Пожалуйста, укажите ваш класс.';
-            return;
+            errorElement.textContent = 'Пожалуйста, укажите ваш класс.'; return;
         }
         const oldUsername = userProfile.username ? userProfile.username.toLowerCase() : null;
         const newUsernameLower = newUsername.toLowerCase();
@@ -175,8 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const newUsernameRef = db.ref(`usernames/${newUsernameLower}`);
         const snapshot = await newUsernameRef.once('value');
         if (snapshot.exists()) {
-            errorElement.textContent = 'Это имя пользователя уже занято.';
-            return;
+            errorElement.textContent = 'Это имя пользователя уже занято.'; return;
         }
         const updates = {};
         updates[`users/${currentUser.uid}/profile/username`] = newUsername;
@@ -193,7 +178,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    // Обработчики в разделе "Мои Оценки"
     document.querySelector('#grades-view .quarter-selector').addEventListener('click', (e) => {
         if (e.target.classList.contains('q-btn')) {
             document.querySelector('#grades-view .quarter-selector .q-btn.active').classList.remove('active');
@@ -215,8 +199,40 @@ document.addEventListener('DOMContentLoaded', () => {
             renderMainContent();
         }
     });
+
+    document.getElementById('leaderboard-sort-controls').addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON') {
+            const sortType = e.target.dataset.sort;
+            if (sortType === currentLeaderboardSort) return;
+            currentLeaderboardSort = sortType;
+            document.querySelector('#leaderboard-sort-controls .button.active').classList.replace('active', 'secondary');
+            e.target.classList.replace('secondary', 'active');
+            renderLeaderboard();
+        }
+    });
+
+    profilePictureContainer.addEventListener('click', () => {
+        profilePictureInput.click();
+    });
+    profilePictureInput.addEventListener('change', handleProfilePictureUpload);
+    
+    document.getElementById('submit-post-btn').addEventListener('click', handlePostSubmit);
+
+    postsContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('post-delete-btn')) {
+            const postId = e.target.dataset.postId;
+            if (confirm('Вы уверены, что хотите удалить этот пост?')) {
+                handleDeletePost(postId);
+            }
+        }
+        if (e.target.classList.contains('clickable-username')) {
+            const username = e.target.dataset.username;
+            if (username) {
+                handleUsernameClick(username);
+            }
+        }
+    });
 });
-// --- КОНЕЦ ОБЕРТКИ DOMContentLoaded ---
 
 
 function getNewQuarterData() {
@@ -239,6 +255,7 @@ function loadUserData() {
         const profileUsername = document.getElementById('profile-username');
         const profileClass = document.getElementById('profile-class');
         const privacyCheckbox = document.getElementById('privacy-checkbox');
+        const profilePictureImg = document.getElementById('profile-picture-img');
         
         db.ref(`users/${currentUser.uid}`).once('value').then(snapshot => {
             const data = snapshot.val() || {};
@@ -248,6 +265,13 @@ function loadUserData() {
             profileUsername.textContent = userProfile.username || 'Имя не указано';
             profileClass.textContent = `Класс: ${userProfile.class || 'Не указан'}`;
             privacyCheckbox.checked = userProfile.isPublic === true;
+
+            if (userProfile.photoURL) {
+                profilePictureImg.src = userProfile.photoURL;
+            } else {
+                profilePictureImg.src = 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png';
+            }
+
             if (!allGradesData[`q${currentQuarter}`]) { allGradesData[`q${currentQuarter}`] = getNewQuarterData(); }
             renderApp();
             renderProfileDashboard();
@@ -259,14 +283,16 @@ function loadUserData() {
 function renderApp() { renderSidebar(); renderMainContent(); const dataForQuarter = allGradesData[`q${currentQuarter}`]; if (dataForQuarter && dataForQuarter.section) { Object.keys(dataForQuarter.section).forEach(calculateAndUpdateSubject); } }
 
 function navigateTo(viewName) { 
-    const views = { profile: document.getElementById('profile-view'), grades: document.getElementById('grades-view'), stats: document.getElementById('stats-view'), users: document.getElementById('users-view') };
-    const navButtons = { profile: document.getElementById('nav-profile'), grades: document.getElementById('nav-grades'), stats: document.getElementById('nav-stats'), users: document.getElementById('nav-users') };
+    const views = { profile: document.getElementById('profile-view'), grades: document.getElementById('grades-view'), stats: document.getElementById('stats-view'), users: document.getElementById('users-view'), leaderboard: document.getElementById('leaderboard-view'), chat: document.getElementById('chat-view') };
+    const navButtons = { profile: document.getElementById('nav-profile'), grades: document.getElementById('nav-grades'), stats: document.getElementById('nav-stats'), users: document.getElementById('nav-users'), leaderboard: document.getElementById('nav-leaderboard'), chat: document.getElementById('nav-chat') };
     Object.values(views).forEach(v => v.classList.add('hidden')); 
     Object.values(navButtons).forEach(b => b.classList.remove('active')); 
     views[viewName].classList.remove('hidden'); 
     navButtons[viewName].classList.add('active'); 
     if (viewName === 'stats') { renderStatisticsView('stats-results-container', allGradesData); } 
     if (viewName === 'profile') { renderProfileDashboard(); } 
+    if (viewName === 'leaderboard') { renderLeaderboard(); } 
+    if (viewName === 'chat') { renderChatView(); } 
 }
 
 function renderStatisticsView(containerId, gradesData, isFriend = false) {
@@ -314,11 +340,7 @@ function renderStatisticsView(containerId, gradesData, isFriend = false) {
     statsAvgText.textContent = `Средняя оценка по предметам: ${averageGrade.toFixed(2)}`;
     gaugeText.textContent = averageGrade.toFixed(2);
     
-    detailsContainer.innerHTML = `
-        <div class="stat-item"><strong>Средний %:</strong><span>${averagePercentage.toFixed(2)} %</span></div>
-        <div class="stat-item"><strong>Лучший предмет:</strong><span>${bestSubject.name} (${bestSubject.percentage.toFixed(2)}%)</span></div>
-        <div class="stat-item"><strong>Худший предмет:</strong><span>${worstSubject.name} (${worstSubject.percentage.toFixed(2)}%)</span></div>
-    `;
+    detailsContainer.innerHTML = `<div class="stat-item"><strong>Средний %:</strong><span>${averagePercentage.toFixed(2)} %</span></div><div class="stat-item"><strong>Лучший предмет:</strong><span>${bestSubject.name} (${bestSubject.percentage.toFixed(2)}%)</span></div><div class="stat-item"><strong>Худший предмет:</strong><span>${worstSubject.name} (${worstSubject.percentage.toFixed(2)}%)</span></div>`;
 
     const gaugePathLength = gaugeElement.getTotalLength();
     gaugeElement.style.strokeDasharray = gaugePathLength;
@@ -365,12 +387,8 @@ function searchAndDisplayUser(username, byLink = false) {
 
 function handleUrlParams() { const params = new URLSearchParams(window.location.search); const userToSearch = params.get('user'); if (userToSearch) { navigateTo('users'); document.getElementById('search-username-input').value = userToSearch; searchAndDisplayUser(userToSearch, true); history.replaceState(null, '', window.location.pathname); } }
 
-// ЗАМЕНИТЕ ЕГО НА ЭТОТ:
 function getGradeFromPercentage(percentage) {
-    // ИСПРАВЛЕНИЕ: Сначала округляем процент до ближайшего целого числа
     const roundedPercentage = Math.round(percentage);
-
-    // Теперь используем округленное значение для определения оценки
     if (roundedPercentage >= 85) return 5;
     if (roundedPercentage >= 65) return 4;
     if (roundedPercentage >= 40) return 3;
@@ -396,3 +414,208 @@ function renderFriendData(friendData, container) {
     renderFriendDataViews();
 }
 
+function calculateOverallStats(gradesData) {
+    const allPercentages = []; const allGrades = [];
+    for (const quarterKey in gradesData) {
+        if (gradesData.hasOwnProperty(quarterKey)) {
+            const quarterData = gradesData[quarterKey];
+            if (quarterData && quarterData.section) {
+                for (const subjectName in quarterData.section) {
+                    if (quarterData.section.hasOwnProperty(subjectName)) {
+                        const percentage = calculateFinalPercentageForFriend(subjectName, quarterData);
+                        if (percentage > 0) {
+                            allPercentages.push(percentage);
+                            allGrades.push(getGradeFromPercentage(percentage));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (allPercentages.length === 0) { return { averagePercentage: 0, averageGrade: 0 }; }
+    const avgPercentage = allPercentages.reduce((a, b) => a + b, 0) / allPercentages.length;
+    const avgGrade = allGrades.reduce((a, b) => a + b, 0) / allGrades.length;
+    return { averagePercentage: avgPercentage, averageGrade: avgGrade };
+}
+
+async function renderLeaderboard() {
+    const container = document.getElementById('leaderboard-table-container');
+    container.innerHTML = '<p>Загрузка данных...</p>';
+    try {
+        const usersRef = db.ref('users');
+        const snapshot = await usersRef.orderByChild('profile/isPublic').equalTo(true).once('value');
+        if (!snapshot.exists()) {
+            container.innerHTML = '<p>Нет публичных профилей для отображения.</p>'; return;
+        }
+        let leaderboardData = [];
+        snapshot.forEach(childSnapshot => {
+            const user = childSnapshot.val();
+            if (user.profile && user.grades) {
+                const stats = calculateOverallStats(user.grades);
+                if (stats.averagePercentage > 0) { 
+                    leaderboardData.push({
+                        username: user.profile.username,
+                        averagePercentage: stats.averagePercentage,
+                        averageGrade: stats.averageGrade
+                    });
+                }
+            }
+        });
+        if (leaderboardData.length === 0) {
+            container.innerHTML = '<p>Нет пользователей с введенными оценками.</p>'; return;
+        }
+        leaderboardData.sort((a, b) => {
+            if (currentLeaderboardSort === 'percentage') {
+                return b.averagePercentage - a.averagePercentage;
+            } else {
+                return b.averageGrade - a.averageGrade;
+            }
+        });
+        let tableHTML = `<table class="leaderboard-table"><thead><tr><th class="rank-col">#</th><th>Пользователь</th><th class="number-col">Средний %</th><th class="number-col">Средняя оценка</th></tr></thead><tbody>`;
+        leaderboardData.forEach((player, index) => {
+            tableHTML += `<tr><td class="rank-col">${index + 1}</td><td>${player.username}</td><td class="number-col">${player.averagePercentage.toFixed(2)} %</td><td class="number-col">${player.averageGrade.toFixed(2)}</td></tr>`;
+        });
+        tableHTML += `</tbody></table>`;
+        container.innerHTML = tableHTML;
+    } catch (error) {
+        console.error("Ошибка при загрузке лидерборда:", error);
+        container.innerHTML = '<p>Не удалось загрузить данные. Попробуйте позже.</p>';
+    }
+}
+
+function handlePostSubmit() {
+    const postTextInput = document.getElementById('post-text-input');
+    const isAnonymous = document.getElementById('post-anonymous-checkbox').checked;
+    const text = postTextInput.value.trim();
+    if (!text) {
+        alert('Нельзя отправить пустой пост.'); return;
+    }
+    const postData = {
+        uid: currentUser.uid,
+        username: isAnonymous ? 'Аноним' : userProfile.username,
+        text: text,
+        isAnonymous: isAnonymous,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+    };
+    db.ref('posts').push(postData)
+        .then(() => {
+            postTextInput.value = '';
+            document.getElementById('post-anonymous-checkbox').checked = false;
+        })
+        .catch(error => {
+            console.error("Ошибка при отправке поста:", error);
+            alert("Не удалось отправить пост. Попробуйте снова.");
+        });
+}
+
+function handleDeletePost(postId) {
+    db.ref('posts/' + postId).remove()
+        .catch(error => {
+            console.error("Ошибка при удалении поста:", error);
+            alert("Не удалось удалить пост. У вас может не быть прав на это действие.");
+        });
+}
+
+function formatTimestamp(ts) {
+    const date = new Date(ts);
+    return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function renderChatView() {
+    const postsContainer = document.getElementById('posts-container');
+    const postsRef = db.ref('posts').orderByChild('timestamp').limitToLast(100);
+    postsRef.on('value', (snapshot) => {
+        postsContainer.innerHTML = '';
+        if (!snapshot.exists()) {
+            postsContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Здесь пока нет постов. Будьте первым!</p>'; return;
+        }
+        const postsData = [];
+        snapshot.forEach(childSnapshot => {
+            postsData.push({ id: childSnapshot.key, ...childSnapshot.val() });
+        });
+        let postsHtml = '';
+        postsData.reverse().forEach(post => {
+            let authorHtml;
+            if (post.isAnonymous) {
+                authorHtml = `<span class="post-author anonymous">${post.username}</span>`;
+            } else {
+                authorHtml = `<span class="post-author clickable-username" data-username="${post.username}">${post.username}</span>`;
+            }
+            const deleteButtonHtml = post.uid === currentUser.uid 
+                ? `<button class="post-delete-btn" data-post-id="${post.id}">&times;</button>` 
+                : '';
+            postsHtml += `
+                <div class="post-card">
+                    ${deleteButtonHtml}
+                    <div class="post-header">
+                        ${authorHtml}
+                        <span class="post-timestamp">${formatTimestamp(post.timestamp)}</span>
+                    </div>
+                    <p class="post-body">${post.text}</p>
+                </div>
+            `;
+        });
+        postsContainer.innerHTML = postsHtml;
+    }, (error) => {
+        console.error("Ошибка при загрузке постов:", error);
+        postsContainer.innerHTML = '<p>Не удалось загрузить посты.</p>';
+    });
+}
+
+async function handleProfilePictureUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        alert('Пожалуйста, выберите файл изображения.'); return;
+    }
+    if (file.size > 5 * 1024 * 1024) { // 5 МБ
+        alert('Файл слишком большой. Максимальный размер - 5 МБ.'); return;
+    }
+
+    // --- НАСТРОЙКИ CLOUDINARY (замените на свои) ---
+    const CLOUD_NAME = "dqj6o60sc"; // Возьмите из дашборда Cloudinary
+    const UPLOAD_PRESET = "ml_default"; // Возьмите из настроек Cloudinary -> Upload
+    // ------------------------------------------------
+
+    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', UPLOAD_PRESET);
+
+    const profilePictureContainer = document.getElementById('profile-picture-container');
+    const profilePictureImg = document.getElementById('profile-picture-img');
+    
+    profilePictureContainer.classList.add('loading');
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error('Ошибка при загрузке изображения.');
+        }
+
+        const data = await response.json();
+        const downloadURL = data.secure_url;
+
+        await db.ref(`users/${currentUser.uid}/profile/photoURL`).set(downloadURL);
+
+        profilePictureImg.src = downloadURL;
+
+    } catch (error) {
+        console.error('Ошибка загрузки фото в Cloudinary:', error);
+        alert('Не удалось загрузить фото. Попробуйте снова.');
+    } finally {
+        profilePictureContainer.classList.remove('loading');
+    }
+}
+
+function handleUsernameClick(username) {
+    navigateTo('users');
+    document.getElementById('search-username-input').value = username;
+    searchAndDisplayUser(username);
+}
