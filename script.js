@@ -365,7 +365,17 @@ function searchAndDisplayUser(username, byLink = false) {
 
 function handleUrlParams() { const params = new URLSearchParams(window.location.search); const userToSearch = params.get('user'); if (userToSearch) { navigateTo('users'); document.getElementById('search-username-input').value = userToSearch; searchAndDisplayUser(userToSearch, true); history.replaceState(null, '', window.location.pathname); } }
 
-function getGradeFromPercentage(percentage) { if (percentage >= 85) return 5; if (percentage >= 65) return 4; if (percentage >= 40) return 3; return 2; }
+// ЗАМЕНИТЕ ЕГО НА ЭТОТ:
+function getGradeFromPercentage(percentage) {
+    // ИСПРАВЛЕНИЕ: Сначала округляем процент до ближайшего целого числа
+    const roundedPercentage = Math.round(percentage);
+
+    // Теперь используем округленное значение для определения оценки
+    if (roundedPercentage >= 85) return 5;
+    if (roundedPercentage >= 65) return 4;
+    if (roundedPercentage >= 40) return 3;
+    return 2;
+}
 function calculateFinalPercentage(sorResult, sorMax, sochResult, sochMax) { let hasSors = sorMax > 0, hasSochs = sochMax > 0, finalPercentage = 0; if (hasSors && hasSochs) { finalPercentage = ((sorResult / sorMax) * 0.5 + (sochResult / sochMax) * 0.5) * 100; } else if (hasSors) { finalPercentage = (sorResult / sorMax) * 100; } else if (hasSochs) { finalPercentage = (sochResult / sochMax) * 100; } return finalPercentage; }
 function calculateFinalPercentageForFriend(subjectName, quarterData) { let sumSorResult = 0, sumSorMax = 0, sumSochResult = 0, sumSochMax = 0; if(quarterData && quarterData.section) { (quarterData.section[subjectName] || []).forEach(task => { const result = parseFloat(task.userResult); if (!isNaN(result)) { sumSorResult += result; sumSorMax += task.max; } }); } if(quarterData && quarterData.quarter) { (quarterData.quarter[subjectName] || []).forEach(task => { const result = parseFloat(task.userResult); if (!isNaN(result)) { sumSochResult += result; sumSochMax += task.max; } }); } return calculateFinalPercentage(sumSorResult, sumSorMax, sumSochResult, sumSochMax); }
 function calculateAndUpdateSubject(subjectName) { const finalPercentage = calculateFinalPercentageForFriend(subjectName, allGradesData[`q${currentQuarter}`]); const grade = getGradeFromPercentage(finalPercentage); const myGradesSidebarBody = document.getElementById('my-grades-sidebar-body'); const subjectRow = myGradesSidebarBody.querySelector(`tr[data-subject="${subjectName}"]`); if (subjectRow) { const percentageCell = subjectRow.querySelector('.subject-percentage'); const gradeCell = subjectRow.querySelector('.subject-grade'); if (finalPercentage > 0) { percentageCell.textContent = `${finalPercentage.toFixed(2)} %`; gradeCell.textContent = grade; } else { percentageCell.textContent = '-- %'; gradeCell.textContent = '-'; } } }
@@ -385,3 +395,4 @@ function renderFriendData(friendData, container) {
     friendTabs.addEventListener('click', e => { if (e.target.classList.contains('tab')) { friendTabs.querySelector('.active').classList.remove('active'); e.target.classList.add('active'); ft = e.target.dataset.tabId; renderFriendGradesView(); }});
     renderFriendDataViews();
 }
+
