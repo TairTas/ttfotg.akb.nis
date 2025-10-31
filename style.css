@@ -134,15 +134,14 @@ input:checked + .slider:before { transform: translateX(22px); }
     #friends-search-section { flex-direction: column; align-items: stretch; gap: 10px; }
     #auth-modal { width: 90%; max-width: 340px; padding: 20px; }
     .stats-details { font-size: 0.95em; }
-
     table { font-size: 14px; }
     th, td { padding: 8px; white-space: nowrap; }
     .main-content input { width: 50px; padding: 6px; }
-    
     .leaderboard-controls { flex-direction: column; align-items: flex-start; }
+    .replies-container { padding-left: 0; }
 }
 
-/* --- ДОБАВЛЕНО ДЛЯ АДМИН ПАНЕЛИ --- */
+/* --- СТИЛИ АДМИН ПАНЕЛИ --- */
 .admin-tabs { display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 20px; }
 .admin-tab { padding: 10px 15px; cursor: pointer; border-radius: 6px 6px 0 0; border: 1px solid transparent; border-bottom: none; margin-right: 5px; color: var(--text-muted); font-weight: 500; }
 .admin-tab.active { background-color: var(--light-primary); border-color: var(--border-color); color: var(--primary-color); }
@@ -156,3 +155,286 @@ input:checked + .slider:before { transform: translateX(22px); }
 .admin-post-author-reveal { font-size: 0.9em; color: #dc3545; font-style: italic; }
 .admin-user-details .email-info { font-size: 0.9em; color: var(--text-muted); }
 .admin-user-details .password-warning { font-size: 0.9em; color: #ffc107; font-weight: 500; }
+
+/* --- СТИЛИ ДЛЯ ЛАЙКОВ И ОТВЕТОВ --- */
+.post-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+    flex-wrap: wrap; 
+}
+.replies-container {
+    margin-top: 15px;
+    padding-left: 50px; 
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.reply-card {
+    display: flex;
+    gap: 10px;
+    font-size: 14px;
+}
+.reply-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+.reply-content {
+    background-color: var(--background-color);
+    padding: 8px 12px;
+    border-radius: 12px;
+    width: 100%;
+}
+.reply-author {
+    font-weight: 600;
+    font-size: 13px;
+}
+.reply-text {
+    margin: 2px 0 0 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+.reply-timestamp {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+.reply-input {
+    flex-grow: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 18px;
+    font-size: 14px;
+    background-color: var(--background-color);
+}
+.reply-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+.reply-submit-btn {
+    padding: 8px 15px;
+    font-size: 13px;
+    border-radius: 18px;
+}
+
+/* --- СТИЛИ ДЛЯ ПРОСМОТРОВ И УЛУЧШЕНИЯ ОТВЕТОВ --- */
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 5px 8px;
+    border-radius: 6px;
+    transition: background-color 0.2s, color 0.2s;
+}
+.action-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+.like-btn:hover {
+    background-color: #fce4e4;
+    color: #c93636;
+}
+.like-btn.liked {
+    color: #e53935;
+    font-weight: 600;
+}
+.reply-toggle-btn:hover {
+    background-color: var(--light-primary);
+    color: var(--primary-color);
+}
+.view-counter {
+    color: var(--text-muted);
+    margin-left: auto; 
+}
+.reply-form {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    padding-top: 15px;
+    padding-left: 0; 
+    border-top: 1px solid var(--border-color);
+}
+.admin-interaction-list {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+}
+.admin-interaction-list p {
+    margin: 4px 0;
+}
+.admin-interaction-list strong {
+    color: var(--text-color);
+}
+.admin-interaction-list span {
+    font-style: italic;
+}
+/* --- ДОБАВЛЕНО ДЛЯ УПРАВЛЕНИЯ ОТВЕТАМИ И АДМИН-ПАНЕЛИ --- */
+.reply-content {
+    position: relative;
+}
+
+.reply-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 5px;
+}
+
+.reply-like-btn {
+    padding: 2px 4px;
+    font-size: 12px;
+}
+
+.reply-like-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.reply-delete-btn {
+    /* Копируем стили из .post-delete-btn и адаптируем */
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: 50%;
+    font-size: 18px;
+    line-height: 24px;
+    text-align: center;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.reply-delete-btn:hover {
+    background-color: #f1f1f1;
+    color: #dc3545;
+}
+
+/* Стили для ответов в админ-панели */
+.admin-replies-container {
+    margin-top: 15px;
+    padding-left: 20px;
+    border-left: 2px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.admin-reply-card {
+    background-color: var(--background-color);
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.9em;
+}
+
+.admin-reply-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9em;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+}
+
+.admin-reply-header strong {
+    color: var(--text-color);
+}
+
+.admin-reply-card p {
+    margin: 0;
+}
+/* --- ДОБАВЛЕНО ДЛЯ СООБЩЕНИЙ АДМИНИСТРАТОРА --- */
+#announcement-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+#announcement-modal {
+    background: var(--card-background);
+    padding: 25px 30px;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 500px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    position: relative;
+    text-align: center;
+}
+
+#announcement-modal h3 {
+    margin-top: 0;
+    color: var(--primary-color);
+}
+
+#announcement-close-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: 50%;
+    font-size: 24px;
+    line-height: 32px;
+    transition: background-color 0.2s, color 0.2s;
+}
+#announcement-close-btn:hover {
+    background-color: #f1f1f1;
+    color: var(--text-color);
+}
+
+.admin-messages-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+.admin-messages-form textarea {
+    width: calc(100% - 20px);
+    min-height: 120px;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 16px;
+    resize: vertical;
+}
+.admin-messages-controls {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+.admin-messages-controls select, .admin-messages-controls input {
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 14px;
+}
