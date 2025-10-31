@@ -19,6 +19,7 @@ let selectedPostFile = null;
 let postsRef = null;
 let postsListener = null;
 let allUsersDataCache = null;
+let postsViewedInSession = {};
 
 document.addEventListener('DOMContentLoaded', () => {
     const appContainer = document.getElementById('app-container');
@@ -220,27 +221,71 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('submit-post-btn').addEventListener('click', handlePostSubmit);
 
     postsContainer.addEventListener('click', (e) => {
-        if (e.target.classList.contains('post-delete-btn')) {
-            const postId = e.target.dataset.postId;
-            if (confirm('Вы уверены, что хотите удалить этот пост?')) {
-                handleDeletePost(postId);
-            }
+        const replyDeleteButton = e.target.closest('.reply-delete-btn');
+        if (replyDeleteButton) {
+            const postId = replyDeleteButton.dataset.postId;
+            const replyId = replyDeleteButton.dataset.replyId;
+            if (confirm('Вы уверены, что хотите удалить этот ответ?')) { handleDeleteReply(postId, replyId); }
+            return;
         }
-        if (e.target.classList.contains('clickable-username')) {
-            const username = e.target.dataset.username;
-            if (username) {
-                handleUsernameClick(username);
-            }
+        const replyLikeButton = e.target.closest('.reply-like-btn');
+        if (replyLikeButton) {
+            const postId = replyLikeButton.dataset.postId;
+            const replyId = replyLikeButton.dataset.replyId;
+            handleReplyLikeToggle(postId, replyId);
+            return;
         }
-        if (e.target.classList.contains('post-image')) {
-            window.open(e.target.src, '_blank');
+        const deleteButton = e.target.closest('.post-delete-btn');
+        if (deleteButton) {
+            const postId = deleteButton.dataset.postId;
+            if (confirm('Вы уверены, что хотите удалить этот пост?')) { handleDeletePost(postId); }
+            return;
+        }
+        const likeButton = e.target.closest('.like-btn');
+        if (likeButton) {
+            const postId = likeButton.dataset.postId;
+            handleLikeToggle(postId);
+            return;
+        }
+        const usernameSpan = e.target.closest('.clickable-username');
+        if (usernameSpan) {
+            const username = usernameSpan.dataset.username;
+            if (username) { handleUsernameClick(username); }
+            return;
+        }
+        const postImage = e.target.closest('.post-image');
+        if (postImage) {
+            window.open(postImage.src, '_blank');
+            return;
+        }
+        const replyToggleButton = e.target.closest('.reply-toggle-btn');
+        if (replyToggleButton) {
+            const postId = replyToggleButton.dataset.postId;
+            document.getElementById(`reply-form-${postId}`).classList.toggle('hidden');
+            return;
+        }
+        const replySubmitButton = e.target.closest('.reply-submit-btn');
+        if (replySubmitButton) {
+            const postId = replySubmitButton.dataset.postId;
+            handleReplySubmit(postId);
+            return;
         }
     });
 
-    // Обработчики для вкладок админ-панели
     document.getElementById('admin-tab-users').addEventListener('click', () => switchAdminTab('users'));
     document.getElementById('admin-tab-posts').addEventListener('click', () => switchAdminTab('posts'));
+    
+    // Добавляем обработчик для новой вкладки админа
+    const adminMessagesTab = document.createElement('div');
+    adminMessagesTab.id = 'admin-tab-messages';
+    adminMessagesTab.className = 'admin-tab';
+    adminMessagesTab.dataset.tab = 'messages';
+    adminMessagesTab.textContent = 'Сообщения';
+    document.querySelector('.admin-tabs').appendChild(adminMessagesTab);
+    adminMessagesTab.addEventListener('click', () => switchAdminTab('messages'));
 });
+
+// --- КОД ФУНКЦИЙ ---
 
 function getNewQuarterData() {
     return JSON.parse(JSON.stringify({
@@ -278,17 +323,19 @@ function loadUserData() {
 
             const adminNavButton = document.getElementById('nav-admin');
             currentUser.getIdTokenResult().then(idTokenResult => {
-                if (!!idTokenResult.claims.admin) {
+                const isAdmin = !!idTokenResult.claims.admin;
+                userProfile.isAdmin = isAdmin;
+                if (isAdmin) {
                     adminNavButton.classList.remove('hidden');
                 } else {
                     adminNavButton.classList.add('hidden');
                 }
+                if (!allGradesData[`q${currentQuarter}`]) { allGradesData[`q${currentQuarter}`] = getNewQuarterData(); }
+                renderApp();
+                renderProfileDashboard();
+                checkForAnnouncements(); // Проверяем сообщения после загрузки
+                resolve();
             });
-
-            if (!allGradesData[`q${currentQuarter}`]) { allGradesData[`q${currentQuarter}`] = getNewQuarterData(); }
-            renderApp();
-            renderProfileDashboard();
-            resolve();
         });
     });
 }
@@ -298,6 +345,9 @@ function navigateTo(viewName) {
         postsRef.off('value', postsListener);
         postsRef = null;
         postsListener = null;
+    }
+    if (viewName !== 'chat') {
+        postsViewedInSession = {};
     }
     const views = { profile: document.getElementById('profile-view'), grades: document.getElementById('grades-view'), stats: document.getElementById('stats-view'), users: document.getElementById('users-view'), leaderboard: document.getElementById('leaderboard-view'), chat: document.getElementById('chat-view'), admin: document.getElementById('admin-panel-view') };
     const navButtons = { profile: document.getElementById('nav-profile'), grades: document.getElementById('nav-grades'), stats: document.getElementById('nav-stats'), users: document.getElementById('nav-users'), leaderboard: document.getElementById('nav-leaderboard'), chat: document.getElementById('nav-chat'), admin: document.getElementById('nav-admin') };
@@ -578,14 +628,12 @@ function userHasAllGrades(gradesData) {
     return hasStartedAtLeastOneQuarter;
 }
 
-// ЗАМЕНИТЕ СТАРУЮ ФУНКЦИЮ НА ЭТУ НОВУЮ
 async function renderLeaderboard() {
     const container = document.getElementById('leaderboard-table-container');
     const filterEnabled = document.getElementById('leaderboard-filter-complete').checked;
     container.innerHTML = '<p>Загрузка данных...</p>';
 
     try {
-        // Загружаем только публичные профили, используя запрос, разрешенный правилами
         const usersRef = db.ref('users');
         const snapshot = await usersRef.orderByChild('profile/isPublic').equalTo(true).once('value');
         
@@ -597,7 +645,6 @@ async function renderLeaderboard() {
         let leaderboardData = [];
         snapshot.forEach(childSnapshot => {
             const user = childSnapshot.val();
-            // Дополнительная проверка, хотя запрос уже должен был это сделать
             if (!user.profile || !user.profile.isPublic) {
                 return;
             }
@@ -696,29 +743,84 @@ async function handlePostSubmit() {
 }
 function handleDeletePost(postId) { db.ref('posts/' + postId).remove().catch(error => { console.error("Ошибка при удалении поста:", error); alert("Не удалось удалить пост. У вас может не быть прав на это действие."); }); }
 function formatTimestamp(ts) { const date = new Date(ts); return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+
 function renderChatView() {
     const postsContainer = document.getElementById('posts-container');
     postsRef = db.ref('posts').orderByChild('timestamp').limitToLast(100);
+
     postsListener = (snapshot) => {
         postsContainer.innerHTML = '';
         if (!snapshot.exists()) {
             postsContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Здесь пока нет постов. Будьте первым!</p>';
             return;
         }
+        
         const postsData = [];
         snapshot.forEach(childSnapshot => {
             postsData.push({ id: childSnapshot.key, ...childSnapshot.val() });
         });
+        
         let postsHtml = '';
         postsData.reverse().forEach(post => {
-            let authorHtml;
-            if (post.isAnonymous) {
-                authorHtml = `<span class="post-author anonymous">${post.username}</span>`;
-            } else {
-                authorHtml = `<span class="post-author clickable-username" data-username="${post.username}">${post.username}</span>`;
+            if (currentUser && !postsViewedInSession[post.id]) {
+                postsViewedInSession[post.id] = true;
+                db.ref(`posts/${post.id}/views/${currentUser.uid}`).set(true);
             }
-            const deleteButtonHtml = post.uid === currentUser.uid ? `<button class="post-delete-btn" data-post-id="${post.id}">&times;</button>` : '';
+
+            const likes = post.likes || {};
+            const likeCount = Object.keys(likes).length;
+            const isLikedByCurrentUser = currentUser && likes[currentUser.uid];
+            
+            const views = post.views || {};
+            const viewCount = Object.keys(views).length;
+            
+            let viewCounterHtml = '';
+            if (currentUser && (post.uid === currentUser.uid || userProfile.isAdmin)) {
+                viewCounterHtml = `
+                    <div class="view-counter action-btn">
+                        <svg viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z"/></svg>
+                        <span>${viewCount}</span>
+                    </div>`;
+            }
+
+            let repliesHtml = '';
+            if (post.replies) {
+                repliesHtml += '<div class="replies-container">';
+                Object.entries(post.replies).sort((a, b) => a[1].timestamp - b[1].timestamp).forEach(([replyId, reply]) => {
+                    const replyLikes = reply.likes || {};
+                    const replyLikeCount = Object.keys(replyLikes).length;
+                    const isReplyLiked = currentUser && replyLikes[currentUser.uid];
+                    const canDeleteReply = currentUser && (reply.uid === currentUser.uid || userProfile.isAdmin);
+                    const replyDeleteBtnHtml = canDeleteReply ? `<button class="reply-delete-btn" data-post-id="${post.id}" data-reply-id="${replyId}">&times;</button>` : '';
+
+                    repliesHtml += `
+                        <div class="reply-card">
+                            <img src="${reply.authorPhotoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" class="reply-avatar">
+                            <div class="reply-content">
+                                ${replyDeleteBtnHtml}
+                                <span class="reply-author">${reply.username}</span>
+                                <p class="reply-text">${reply.text}</p>
+                                <div class="reply-actions">
+                                     <button class="reply-like-btn action-btn ${isReplyLiked ? 'liked' : ''}" data-post-id="${post.id}" data-reply-id="${replyId}">
+                                        <svg viewBox="0 0 24 24"><path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"></path></svg>
+                                        <span>${replyLikeCount}</span>
+                                    </button>
+                                </div>
+                                <div class="reply-timestamp">${formatTimestamp(reply.timestamp)}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                repliesHtml += '</div>';
+            }
+
+            let authorHtml = post.isAnonymous 
+                ? `<span class="post-author anonymous">${post.username}</span>`
+                : `<span class="post-author clickable-username" data-username="${post.username}">${post.username}</span>`;
+            
+            const deleteButtonHtml = (currentUser && (post.uid === currentUser.uid || userProfile.isAdmin)) ? `<button class="post-delete-btn" data-post-id="${post.id}">&times;</button>` : '';
             const postImageHtml = post.imageURL ? `<img src="${post.imageURL}" class="post-image" alt="Прикрепленное изображение">` : '';
+
             postsHtml += `
                 <div class="post-card">
                     ${deleteButtonHtml}
@@ -731,6 +833,22 @@ function renderChatView() {
                     </div>
                     ${post.text ? `<p class="post-body">${post.text}</p>` : ''}
                     ${postImageHtml}
+                    <div class="post-actions">
+                        <button class="like-btn action-btn ${isLikedByCurrentUser ? 'liked' : ''}" data-post-id="${post.id}">
+                            <svg viewBox="0 0 24 24"><path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"></path></svg>
+                            <span>${likeCount}</span>
+                        </button>
+                        <button class="reply-toggle-btn action-btn" data-post-id="${post.id}">
+                             <svg viewBox="0 0 24 24"><path d="M9,22A1,1 0 0,1 8,21V18H4A2,2 0 0,1 2,16V4C2,2.89 2.9,2 4,2H20A2,2 0 0,1 22,4V16A2,2 0 0,1 20,18H13.9L10.2,21.71C10,21.9 9.75,22 9.5,22V22H9Z" /></svg>
+                             <span>Ответить</span>
+                        </button>
+                        ${viewCounterHtml}
+                    </div>
+                    ${repliesHtml}
+                    <div class="reply-form hidden" id="reply-form-${post.id}">
+                        <input type="text" id="reply-input-${post.id}" class="reply-input" placeholder="Написать ответ...">
+                        <button class="button reply-submit-btn" data-post-id="${post.id}">Отправить</button>
+                    </div>
                 </div>
             `;
         });
@@ -741,6 +859,41 @@ function renderChatView() {
         postsContainer.innerHTML = '<p>Не удалось загрузить посты.</p>';
     });
 }
+
+function handleLikeToggle(postId) {
+    if (!currentUser) return;
+    const likeRef = db.ref(`posts/${postId}/likes/${currentUser.uid}`);
+    likeRef.transaction(currentData => (currentData ? null : true));
+}
+
+function handleReplyLikeToggle(postId, replyId) {
+    if (!currentUser) return;
+    const likeRef = db.ref(`posts/${postId}/replies/${replyId}/likes/${currentUser.uid}`);
+    likeRef.transaction(currentData => (currentData ? null : true));
+}
+
+function handleReplySubmit(postId) {
+    if (!currentUser) return;
+    const replyInput = document.getElementById(`reply-input-${postId}`);
+    const text = replyInput.value.trim();
+    if (!text) { alert('Ответ не может быть пустым.'); return; }
+    const replyData = {
+        uid: currentUser.uid,
+        username: userProfile.username,
+        text: text,
+        timestamp: firebase.database.ServerValue.TIMESTAMP,
+        authorPhotoURL: userProfile.photoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'
+    };
+    db.ref(`posts/${postId}/replies`).push(replyData)
+        .then(() => { replyInput.value = ''; })
+        .catch(error => { console.error("Ошибка при отправке ответа:", error); alert("Не удалось отправить ответ."); });
+}
+
+function handleDeleteReply(postId, replyId) {
+    db.ref(`posts/${postId}/replies/${replyId}`).remove()
+        .catch(error => { console.error("Ошибка при удалении ответа:", error); alert("Не удалось удалить ответ."); });
+}
+
 async function uploadToCloudinary(file) {
     const CLOUD_NAME = "dqj6o60sc";
     const UPLOAD_PRESET = "ml_default";
@@ -808,15 +961,63 @@ function removeSelectedPostImage() {
     document.getElementById('post-image-preview').src = '#';
 }
 
-// --- НОВЫЕ ФУНКЦИИ ДЛЯ АДМИН ПАНЕЛИ ---
+// --- НОВЫЕ ФУНКЦИИ ДЛЯ ОБЪЯВЛЕНИЙ ---
+
+async function checkForAnnouncements() {
+    if (!currentUser) return;
+
+    // 1. Получаем все необходимые данные параллельно
+    const [userAnnouncementsSnap, globalAnnouncementsSnap, seenAnnouncementsSnap] = await Promise.all([
+        db.ref(`announcements/user/${currentUser.uid}`).once('value'),
+        db.ref('announcements/global').once('value'),
+        db.ref(`users/${currentUser.uid}/seenAnnouncements`).once('value')
+    ]);
+
+    const userAnnouncements = userAnnouncementsSnap.val() || {};
+    const globalAnnouncements = globalAnnouncementsSnap.val() || {};
+    const seenAnnouncements = seenAnnouncementsSnap.val() || {};
+
+    // 2. Объединяем все объявления и фильтруем просмотренные
+    const allAnnouncements = { ...globalAnnouncements, ...userAnnouncements };
+    const unseenAnnouncements = Object.entries(allAnnouncements)
+        .filter(([id]) => !seenAnnouncements[id]);
+
+    // 3. Если есть непросмотренные, показываем самое новое
+    if (unseenAnnouncements.length > 0) {
+        unseenAnnouncements.sort((a, b) => b[1].timestamp - a[1].timestamp);
+        const [latestId, latestData] = unseenAnnouncements[0];
+        displayAnnouncement(latestId, latestData);
+    }
+}
+
+function displayAnnouncement(announcementId, announcementData) {
+    const overlay = document.getElementById('announcement-overlay');
+    const textElement = document.getElementById('announcement-text');
+    const closeBtn = document.getElementById('announcement-close-btn');
+
+    textElement.textContent = announcementData.message;
+    overlay.classList.remove('hidden');
+
+    const closeHandler = () => {
+        overlay.classList.add('hidden');
+        // Отмечаем как просмотренное в Firebase
+        db.ref(`users/${currentUser.uid}/seenAnnouncements/${announcementId}`).set(true);
+        // Удаляем обработчик, чтобы избежать дублирования
+        closeBtn.removeEventListener('click', closeHandler);
+    };
+    
+    closeBtn.addEventListener('click', closeHandler);
+}
+
+// --- ФУНКЦИИ АДМИН ПАНЕЛИ ---
 
 function renderAdminPanel() {
     switchAdminTab('users');
 }
 
 function switchAdminTab(tabName) {
-    document.querySelector('.admin-tab.active').classList.remove('active');
-    document.getElementById(`admin-tab-${tabName}`).classList.add('active');
+    document.querySelector('.admin-tab.active')?.classList.remove('active');
+    document.getElementById(`admin-tab-${tabName}`)?.classList.add('active');
     
     const container = document.getElementById('admin-content-container');
     container.innerHTML = '<p>Загрузка данных...</p>';
@@ -825,6 +1026,8 @@ function switchAdminTab(tabName) {
         renderAdminUsersTab();
     } else if (tabName === 'posts') {
         renderAdminPostsTab();
+    } else if (tabName === 'messages') {
+        renderAdminMessagesTab();
     }
 }
 
@@ -839,7 +1042,11 @@ async function renderAdminUsersTab() {
             return;
         }
         const usernames = usernamesSnapshot.val();
-        const uidsToFetch = Object.values(usernames);
+        if (!usernames) {
+             container.innerHTML = '<p>Пользователи не найдены.</p>';
+            return;
+        }
+        const uidsToFetch = Object.values(usernames).filter(uid => uid);
 
         const userPromises = uidsToFetch.map(uid => db.ref('users/' + uid).once('value'));
         const userSnapshots = await Promise.all(userPromises);
@@ -1123,8 +1330,8 @@ async function renderAdminPostsTab() {
     container.innerHTML = '<p>Загрузка постов...</p>';
     try {
         if (!allUsersDataCache) {
-             await renderAdminUsersTab(); // Убедимся, что кеш пользователей загружен
-             container.innerHTML = '<p>Загрузка постов...</p>'; // Возвращаем сообщение о загрузке
+             await renderAdminUsersTab();
+             container.innerHTML = '<p>Загрузка постов...</p>';
         }
 
         const postsSnapshot = await db.ref('posts').orderByChild('timestamp').once('value');
@@ -1149,9 +1356,33 @@ async function renderAdminPostsTab() {
             if (post.isAnonymous) {
                 authorInfo += ` <span class="admin-post-author-reveal">(настоящий автор: ${realUsername})</span>`;
             }
+            
+            const likers = post.likes ? Object.keys(post.likes).map(uid => allUsersDataCache[uid]?.profile?.username || `id:${uid.substring(0,5)}`).join(', ') : 'Никто';
+            const viewers = post.views ? Object.keys(post.views).map(uid => allUsersDataCache[uid]?.profile?.username || `id:${uid.substring(0,5)}`).join(', ') : 'Никто';
+            
+            let repliesAdminHtml = '';
+            if (post.replies) {
+                repliesAdminHtml = '<div class="admin-replies-container">';
+                Object.entries(post.replies).forEach(([replyId, reply]) => {
+                    const replyLikers = reply.likes ? Object.keys(reply.likes).map(uid => allUsersDataCache[uid]?.profile?.username || `id:${uid.substring(0,5)}`).join(', ') : 'Никто';
+                    repliesAdminHtml += `
+                        <div class="admin-reply-card" id="admin-reply-${replyId}">
+                            <div class="admin-reply-header">
+                                <span>Ответ от <strong>${reply.username}</strong></span>
+                                <button class="button secondary" style="padding: 2px 8px; font-size: 12px;" onclick="adminDeleteReply('${post.id}', '${replyId}')">Удалить</button>
+                            </div>
+                            <p>${reply.text}</p>
+                            <div class="admin-interaction-list" style="border-top: none; padding-top: 5px; margin-top: 5px;">
+                                <p style="font-size: 0.9em;"><strong>Лайкнули:</strong> <span>${replyLikers}</span></p>
+                            </div>
+                        </div>
+                    `;
+                });
+                repliesAdminHtml += '</div>';
+            }
 
             postsHtml += `
-                <div class="admin-post-card">
+                <div class="admin-post-card" id="admin-post-${post.id}">
                     <div class="post-header">
                          <img src="${authorPhoto || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" class="post-avatar">
                          <div class="post-author-info">
@@ -1161,8 +1392,13 @@ async function renderAdminPostsTab() {
                     </div>
                     ${post.text ? `<p class="post-body">${post.text}</p>` : ''}
                     ${post.imageURL ? `<img src="${post.imageURL}" class="post-image" alt="Прикрепленное изображение" style="max-width: 200px;">` : ''}
+                    <div class="admin-interaction-list">
+                        <p><strong>Лайкнули пост:</strong> <span>${likers}</span></p>
+                        <p><strong>Просмотрели:</strong> <span>${viewers}</span></p>
+                    </div>
+                    ${repliesAdminHtml}
                     <div class="admin-user-actions">
-                        <button class="button secondary" onclick="adminDeletePost('${post.id}', this)">Удалить пост</button>
+                        <button class="button secondary" onclick="adminDeletePost('${post.id}')">Удалить пост</button>
                     </div>
                 </div>
             `;
@@ -1174,15 +1410,104 @@ async function renderAdminPostsTab() {
     }
 }
 
-function adminDeletePost(postId, button) {
+function adminDeletePost(postId) {
     if (!confirm("Вы уверены, что хотите удалить этот пост?")) return;
     db.ref('posts/' + postId).remove()
         .then(() => {
             alert("Пост удален.");
-            button.closest('.admin-post-card').remove();
+            document.getElementById(`admin-post-${postId}`)?.remove();
         })
         .catch(error => {
             console.error("Ошибка при удалении поста:", error);
             alert("Не удалось удалить пост.");
         });
+}
+
+function adminDeleteReply(postId, replyId) {
+    if (!confirm("Вы уверены, что хотите удалить этот ответ?")) return;
+    db.ref(`posts/${postId}/replies/${replyId}`).remove()
+        .then(() => {
+            alert("Ответ удален.");
+            document.getElementById(`admin-reply-${replyId}`)?.remove();
+        })
+        .catch(error => {
+            console.error("Ошибка при удалении ответа:", error);
+            alert("Не удалось удалить ответ.");
+        });
+}
+
+// НОВЫЕ ФУНКЦИИ ДЛЯ ВКЛАДКИ СООБЩЕНИЙ В АДМИН-ПАНЕЛИ
+async function renderAdminMessagesTab() {
+    const container = document.getElementById('admin-content-container');
+    
+    // Убедимся, что кеш пользователей загружен
+    if (!allUsersDataCache) {
+        await renderAdminUsersTab();
+        // После загрузки renderAdminUsersTab уже отрисует свой контент,
+        // поэтому нам нужно снова вызвать эту функцию, чтобы отрисовать вкладку сообщений
+        renderAdminMessagesTab(); 
+        return;
+    }
+
+    let userOptions = '<option value="all">Всем пользователям</option>';
+    if(allUsersDataCache) {
+        for(const uid in allUsersDataCache) {
+            const username = allUsersDataCache[uid]?.profile?.username;
+            if (username) {
+                userOptions += `<option value="${username}">${username}</option>`;
+            }
+        }
+    }
+
+    container.innerHTML = `
+        <div class="admin-messages-form">
+            <textarea id="admin-message-text" placeholder="Введите ваше сообщение здесь..."></textarea>
+            <div class="admin-messages-controls">
+                <label for="admin-message-recipient">Отправить:</label>
+                <select id="admin-message-recipient">
+                    ${userOptions}
+                </select>
+                <button id="admin-send-message-btn" class="button">Отправить</button>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('admin-send-message-btn').addEventListener('click', handleAdminMessageSend);
+}
+
+async function handleAdminMessageSend() {
+    const messageText = document.getElementById('admin-message-text').value.trim();
+    const recipient = document.getElementById('admin-message-recipient').value;
+
+    if (!messageText) {
+        alert('Сообщение не может быть пустым.');
+        return;
+    }
+
+    const announcement = {
+        message: messageText,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+    };
+
+    try {
+        if (recipient === 'all') {
+            await db.ref('announcements/global').push(announcement);
+            alert('Глобальное сообщение успешно отправлено!');
+        } else {
+            // recipient - это username. Нужно найти UID.
+            const usernameSnapshot = await db.ref('usernames').child(recipient.toLowerCase()).once('value');
+            if (usernameSnapshot.exists()) {
+                const uid = usernameSnapshot.val();
+                await db.ref(`announcements/user/${uid}`).push(announcement);
+                alert(`Сообщение успешно отправлено пользователю ${recipient}!`);
+            } else {
+                alert(`Ошибка: пользователь с именем ${recipient} не найден.`);
+                return;
+            }
+        }
+        document.getElementById('admin-message-text').value = ''; // Очищаем поле
+    } catch (error) {
+        console.error('Ошибка при отправке сообщения:', error);
+        alert('Не удалось отправить сообщение. Проверьте консоль на наличие ошибок.');
+    }
 }
