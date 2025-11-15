@@ -51,7 +51,7 @@
             <button id="nav-stats" class="main-nav-btn">Статистика</button>
             <button id="nav-users" class="main-nav-btn">Пользователи</button>
             <button id="nav-leaderboard" class="main-nav-btn">Лидерборд</button>
-            <button id="nav-chat" class="main-nav-btn">Чат</button>
+            <button id="nav-chat" class="main-nav-btn">Форум</button>
             <button id="nav-admin" class="main-nav-btn hidden">Админ Панель</button>
         </nav>
         
@@ -124,12 +124,31 @@
             </div>
 
             <div id="users-view" class="hidden">
-                <div class="content-card"><div id="friends-search-section"><h3>Поиск пользователя</h3><input type="text" id="search-username-input" placeholder="Введите точное имя пользователя"><button id="search-user-button" class="button">Найти</button></div><div id="friend-results-container"></div></div>
+                <div class="content-card">
+                    <div id="friends-search-section">
+                        <h3>Поиск пользователя</h3>
+                        <input type="text" id="search-username-input" placeholder="Введите точное имя пользователя">
+                        <button id="search-user-button" class="button">Найти</button>
+                    </div>
+                    <div id="friend-results-container"></div>
+                </div>
+                <div class="content-card" style="margin-top: 20px;">
+                    <h3>Все пользователи по классам</h3>
+                    <div id="classes-container" class="classes-container"></div>
+                    <div id="users-list-container" class="users-list-container hidden"></div>
+                </div>
             </div>
             
             <div id="leaderboard-view" class="hidden">
                 <div class="content-card">
                     <h3>Лидерборд</h3>
+                    <div class="quarter-selector" id="leaderboard-quarter-selector">
+                        <button class="q-btn active" data-quarter="all">Все четверти</button>
+                        <button class="q-btn" data-quarter="1">1</button>
+                        <button class="q-btn" data-quarter="2">2</button>
+                        <button class="q-btn" data-quarter="3">3</button>
+                        <button class="q-btn" data-quarter="4">4</button>
+                    </div>
                     <div class="leaderboard-controls">
                         <div id="leaderboard-sort-controls">
                             <span>Сортировать по: </span>
@@ -148,7 +167,11 @@
 
             <div id="chat-view" class="hidden">
                 <div class="content-card">
-                    <h3>Общий чат</h3>
+                    <h3>Форум</h3>
+                    <div class="forum-categories">
+                        <button class="forum-category-btn active" data-category="chat">Чат</button>
+                        <button class="forum-category-btn" data-category="homework">ДЗ</button>
+                    </div>
                     <div id="post-creation-form">
                         <textarea id="post-text-input" placeholder="Что у вас нового?" maxlength="280"></textarea>
                         
@@ -177,6 +200,8 @@
                     <div class="admin-tabs">
                         <div id="admin-tab-users" class="admin-tab active" data-tab="users">Пользователи</div>
                         <div id="admin-tab-posts" class="admin-tab" data-tab="posts">Посты</div>
+                        <div id="admin-tab-prefixes" class="admin-tab" data-tab="prefixes">Назначение префиксов</div>
+                        <div id="admin-tab-messages" class="admin-tab" data-tab="messages">Сообщения</div>
                     </div>
                     <div id="admin-content-container">
                         <!-- Контент для вкладок будет загружаться сюда -->
