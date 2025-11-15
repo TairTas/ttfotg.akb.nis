@@ -306,6 +306,31 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('admin-tab-posts').addEventListener('click', () => switchAdminTab('posts'));
     document.getElementById('admin-tab-prefixes').addEventListener('click', () => switchAdminTab('prefixes'));
     document.getElementById('admin-tab-messages').addEventListener('click', () => switchAdminTab('messages'));
+    
+    // Обработчики для модального окна сравнения
+    document.getElementById('compare-modal-close-btn').addEventListener('click', () => {
+        document.getElementById('compare-modal-overlay').classList.add('hidden');
+    });
+    document.getElementById('compare-search-btn').addEventListener('click', () => {
+        const username = document.getElementById('compare-search-input').value.trim();
+        searchUserForCompare(username);
+    });
+    document.getElementById('compare-search-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const username = document.getElementById('compare-search-input').value.trim();
+            searchUserForCompare(username);
+        }
+    });
+    document.getElementById('compare-quarter-selector').addEventListener('click', (e) => {
+        if (e.target.classList.contains('q-btn')) {
+            document.querySelector('#compare-quarter-selector .q-btn.active').classList.remove('active');
+            e.target.classList.add('active');
+            const quarter = parseInt(e.target.dataset.quarter, 10);
+            if (window.compareData) {
+                renderCompareView(window.compareData.user1, window.compareData.user2, quarter);
+            }
+        }
+    });
 });
 
 // --- КОД ФУНКЦИЙ ---
@@ -402,12 +427,12 @@ function navigateTo(viewName) {
     if (viewName !== 'chat') {
         postsViewedInSession = {};
     }
-    const views = { profile: document.getElementById('profile-view'), grades: document.getElementById('grades-view'), stats: document.getElementById('stats-view'), users: document.getElementById('users-view'), leaderboard: document.getElementById('leaderboard-view'), chat: document.getElementById('chat-view'), admin: document.getElementById('admin-panel-view') };
+    const views = { profile: document.getElementById('profile-view'), grades: document.getElementById('grades-view'), stats: document.getElementById('stats-view'), users: document.getElementById('users-view'), leaderboard: document.getElementById('leaderboard-view'), chat: document.getElementById('chat-view'), admin: document.getElementById('admin-panel-view'), compare: document.getElementById('compare-view') };
     const navButtons = { profile: document.getElementById('nav-profile'), grades: document.getElementById('nav-grades'), stats: document.getElementById('nav-stats'), users: document.getElementById('nav-users'), leaderboard: document.getElementById('nav-leaderboard'), chat: document.getElementById('nav-chat'), admin: document.getElementById('nav-admin') };
-    Object.values(views).forEach(v => v.classList.add('hidden')); 
-    Object.values(navButtons).forEach(b => b.classList.remove('active')); 
-    views[viewName].classList.remove('hidden'); 
-    navButtons[viewName].classList.add('active'); 
+    Object.values(views).forEach(v => v && v.classList.add('hidden')); 
+    Object.values(navButtons).forEach(b => b && b.classList.remove('active')); 
+    if (views[viewName]) views[viewName].classList.remove('hidden');
+    if (navButtons[viewName]) navButtons[viewName].classList.add('active'); 
     if (viewName === 'stats') { renderStatisticsView('stats-results-container', allGradesData); } 
     if (viewName === 'profile') { renderProfileDashboard(); } 
     if (viewName === 'leaderboard') { renderLeaderboard(); } 
@@ -489,7 +514,8 @@ function searchAndDisplayUser(username, byLink = false) {
         db.ref(`users/${friendUid}`).once('value').then(userSnapshot => {
             const friendData = userSnapshot.val();
             if (!friendData || !friendData.profile || (!friendData.profile.isPublic && !byLink)) { resultsContainer.innerHTML = `<p class="no-data-message">Пользователь не найден или его профиль скрыт.</p>`; return; }
-            renderFriendData(friendData, resultsContainer);
+            // Передаем uid в функцию renderFriendData
+            renderFriendData(friendData, resultsContainer, friendUid);
         });
     });
 }
@@ -670,8 +696,8 @@ async function handleUserCardClick(uid, username) {
             return;
         }
         
-        // Если профиль публичный, показываем данные
-        renderFriendData(friendData, resultsContainer);
+        // Передаем uid в функцию renderFriendData
+        renderFriendData(friendData, resultsContainer, uid);
         
         // Прокручиваем к результатам поиска
         resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -799,9 +825,14 @@ function renderSidebar() {
         });
     });
 }
-function renderFriendData(friendData, container) {
+function renderFriendData(friendData, container, friendUid = null) {
     const friendGrades = friendData.grades || {};
     const friendProfile = friendData.profile;
+    // Используем переданный uid или пытаемся найти его в данных
+    const uid = friendUid || friendData.uid || (container.dataset && container.dataset.uid);
+    if (!uid) {
+        console.error("UID не найден для пользователя:", friendProfile.username);
+    }
     container.innerHTML = `
         <div class="friend-profile-header">
             <img src="${friendProfile.photoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" alt="Фото профиля ${friendProfile.username}">
@@ -809,6 +840,7 @@ function renderFriendData(friendData, container) {
                 <h3>Профиль: ${friendProfile.username} ${generatePrefixesHtml(friendProfile.prefixes)}</h3>
                 <p>Класс: ${friendProfile.class || 'Не указан'}</p>
             </div>
+            ${uid ? `<button class="button" onclick="openCompareModal('${uid}', '${friendProfile.username}')" style="margin-left: auto;">Сравнить</button>` : ''}
         </div>
         <div class="friend-data-section">
             <h4>Статистика</h4>
@@ -2108,4 +2140,291 @@ async function handleAdminMessageSend() {
         console.error('Ошибка при отправке сообщения:', error);
         alert('Не удалось отправить сообщение. Проверьте консоль на наличие ошибок.');
     }
+}
+
+// --- ФУНКЦИИ ДЛЯ СРАВНЕНИЯ ПРОФИЛЕЙ ---
+
+let compareUser1Data = null;
+let compareUser1Uid = null;
+
+function openCompareModal(uid, username) {
+    compareUser1Uid = uid;
+    document.getElementById('compare-modal-overlay').classList.remove('hidden');
+    document.getElementById('compare-search-input').value = '';
+    document.getElementById('compare-search-results').innerHTML = '';
+}
+
+async function searchUserForCompare(username) {
+    const resultsContainer = document.getElementById('compare-search-results');
+    if (!username) {
+        resultsContainer.innerHTML = '<p class="no-data-message">Введите имя пользователя.</p>';
+        return;
+    }
+    
+    resultsContainer.innerHTML = '<p class="no-data-message">Поиск...</p>';
+    
+    try {
+        const usernameSnapshot = await db.ref(`usernames/${username.toLowerCase()}`).once('value');
+        if (!usernameSnapshot.exists()) {
+            resultsContainer.innerHTML = '<p class="no-data-message">Пользователь не найден.</p>';
+            return;
+        }
+        
+        const uid = usernameSnapshot.val();
+        const userSnapshot = await db.ref(`users/${uid}`).once('value');
+        if (!userSnapshot.exists()) {
+            resultsContainer.innerHTML = '<p class="no-data-message">Пользователь не найден.</p>';
+            return;
+        }
+        
+        const userData = userSnapshot.val();
+        if (!userData || !userData.profile) {
+            resultsContainer.innerHTML = '<p class="no-data-message">Данные пользователя не найдены.</p>';
+            return;
+        }
+        
+        // Проверяем приватность (для сравнения можно сравнивать только публичные профили или свой)
+        if (!userData.profile.isPublic && uid !== currentUser.uid) {
+            resultsContainer.innerHTML = '<p class="no-data-message">Этот аккаунт приватный. Вы не можете сравнивать с ним.</p>';
+            return;
+        }
+        
+        // Показываем найденного пользователя
+        const prefixesHtml = generatePrefixesHtml(userData.profile.prefixes || []);
+        resultsContainer.innerHTML = `
+            <div style="margin-top: 15px; padding: 15px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-background);">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <img src="${userData.profile.photoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                    <div>
+                        <p style="margin: 0; font-weight: 600;">${userData.profile.username} ${prefixesHtml}</p>
+                        <p style="margin: 5px 0 0 0; color: var(--text-muted);">${userData.profile.class || 'Класс не указан'}</p>
+                    </div>
+                    <button class="button" onclick="selectCompareUser('${uid}')" style="margin-left: auto;">Выбрать</button>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error("Ошибка при поиске пользователя:", error);
+        resultsContainer.innerHTML = '<p class="no-data-message">Не удалось найти пользователя.</p>';
+    }
+}
+
+async function selectCompareUser(uid2) {
+    // Закрываем модальное окно
+    document.getElementById('compare-modal-overlay').classList.add('hidden');
+    
+    try {
+        // Загружаем данные первого пользователя
+        const user1Snapshot = await db.ref(`users/${compareUser1Uid}`).once('value');
+        if (!user1Snapshot.exists()) {
+            alert('Не удалось загрузить данные первого пользователя.');
+            return;
+        }
+        const user1Data = { uid: compareUser1Uid, ...user1Snapshot.val() };
+        
+        // Загружаем данные второго пользователя
+        let user2Data;
+        if (uid2 === 'self') {
+            // Сравниваем с собой
+            if (!currentUser) {
+                alert('Вы не авторизованы.');
+                return;
+            }
+            const selfSnapshot = await db.ref(`users/${currentUser.uid}`).once('value');
+            if (!selfSnapshot.exists()) {
+                alert('Не удалось загрузить ваши данные.');
+                return;
+            }
+            user2Data = { uid: currentUser.uid, ...selfSnapshot.val() };
+        } else {
+            const user2Snapshot = await db.ref(`users/${uid2}`).once('value');
+            if (!user2Snapshot.exists()) {
+                alert('Не удалось загрузить данные второго пользователя.');
+                return;
+            }
+            user2Data = { uid: uid2, ...user2Snapshot.val() };
+        }
+        
+        // Сохраняем данные для использования в renderCompareView
+        window.compareData = { user1: user1Data, user2: user2Data };
+        
+        // Переключаемся на вкладку сравнения
+        navigateTo('compare');
+        
+        // Отображаем сравнение
+        renderCompareView(user1Data, user2Data, 1);
+    } catch (error) {
+        console.error("Ошибка при загрузке данных для сравнения:", error);
+        alert('Не удалось загрузить данные для сравнения.');
+    }
+}
+
+function renderCompareView(user1Data, user2Data, quarter) {
+    const container = document.getElementById('compare-profiles-container');
+    const user1Profile = user1Data.profile;
+    const user2Profile = user2Data.profile;
+    const user1Grades = user1Data.grades || {};
+    const user2Grades = user2Data.grades || {};
+    
+    const quarterData1 = user1Grades[`q${quarter}`] || getNewQuarterData();
+    const quarterData2 = user2Grades[`q${quarter}`] || getNewQuarterData();
+    
+    // Статистика для обоих пользователей
+    const stats1 = calculateCompareStats(quarterData1);
+    const stats2 = calculateCompareStats(quarterData2);
+    
+    const prefixes1Html = generatePrefixesHtml(user1Profile.prefixes || []);
+    const prefixes2Html = generatePrefixesHtml(user2Profile.prefixes || []);
+    
+    let compareHtml = `
+        <div class="compare-profiles-grid">
+            <div class="compare-profile-column">
+                <div class="compare-profile-header">
+                    <img src="${user1Profile.photoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" alt="${user1Profile.username}">
+                    <div>
+                        <h4>${user1Profile.username} ${prefixes1Html}</h4>
+                        <p>${user1Profile.class || 'Класс не указан'}</p>
+                    </div>
+                </div>
+                <div class="compare-stats-section">
+                    <h5>Статистика</h5>
+                    <div class="compare-stats-item">
+                        <span>Средний %:</span>
+                        <strong>${stats1.averagePercentage.toFixed(2)}%</strong>
+                    </div>
+                    <div class="compare-stats-item">
+                        <span>Средняя оценка:</span>
+                        <strong>${stats1.averageGrade.toFixed(2)}</strong>
+                    </div>
+                    <div class="compare-stats-item">
+                        <span>Лучший предмет:</span>
+                        <strong>${stats1.bestSubject || 'Нет данных'}</strong>
+                    </div>
+                    <div class="compare-stats-item">
+                        <span>Худший предмет:</span>
+                        <strong>${stats1.worstSubject || 'Нет данных'}</strong>
+                    </div>
+                </div>
+                <div class="compare-grades-section">
+                    <h5>Оценки по предметам</h5>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr><th>Предмет</th><th>%</th><th>Оценка</th></tr>
+                            </thead>
+                            <tbody id="compare-grades-user1"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="compare-profile-column">
+                <div class="compare-profile-header">
+                    <img src="${user2Profile.photoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" alt="${user2Profile.username}">
+                    <div>
+                        <h4>${user2Profile.username} ${prefixes2Html}</h4>
+                        <p>${user2Profile.class || 'Класс не указан'}</p>
+                    </div>
+                </div>
+                <div class="compare-stats-section">
+                    <h5>Статистика</h5>
+                    <div class="compare-stats-item">
+                        <span>Средний %:</span>
+                        <strong>${stats2.averagePercentage.toFixed(2)}%</strong>
+                    </div>
+                    <div class="compare-stats-item">
+                        <span>Средняя оценка:</span>
+                        <strong>${stats2.averageGrade.toFixed(2)}</strong>
+                    </div>
+                    <div class="compare-stats-item">
+                        <span>Лучший предмет:</span>
+                        <strong>${stats2.bestSubject || 'Нет данных'}</strong>
+                    </div>
+                    <div class="compare-stats-item">
+                        <span>Худший предмет:</span>
+                        <strong>${stats2.worstSubject || 'Нет данных'}</strong>
+                    </div>
+                </div>
+                <div class="compare-grades-section">
+                    <h5>Оценки по предметам</h5>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr><th>Предмет</th><th>%</th><th>Оценка</th></tr>
+                            </thead>
+                            <tbody id="compare-grades-user2"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = compareHtml;
+    
+    // Заполняем таблицы оценок
+    const tbody1 = document.getElementById('compare-grades-user1');
+    const tbody2 = document.getElementById('compare-grades-user2');
+    
+    const subjects1 = Object.keys(quarterData1.section || {});
+    const subjects2 = Object.keys(quarterData2.section || {});
+    const allSubjects = [...new Set([...subjects1, ...subjects2])];
+    
+    allSubjects.forEach(subject => {
+        const p1 = calculateFinalPercentageForFriend(subject, quarterData1);
+        const g1 = getGradeFromPercentage(p1);
+        const p2 = calculateFinalPercentageForFriend(subject, quarterData2);
+        const g2 = getGradeFromPercentage(p2);
+        
+        const row1 = document.createElement('tr');
+        row1.innerHTML = `
+            <td>${subject}</td>
+            <td class="subject-percentage">${(p1 !== null && p1 >= 0) ? p1.toFixed(2) + ' %' : '-- %'}</td>
+            <td class="subject-grade">${(p1 !== null && p1 >= 0) ? g1 : '-'}</td>
+        `;
+        tbody1.appendChild(row1);
+        
+        const row2 = document.createElement('tr');
+        row2.innerHTML = `
+            <td>${subject}</td>
+            <td class="subject-percentage">${(p2 !== null && p2 >= 0) ? p2.toFixed(2) + ' %' : '-- %'}</td>
+            <td class="subject-grade">${(p2 !== null && p2 >= 0) ? g2 : '-'}</td>
+        `;
+        tbody2.appendChild(row2);
+    });
+}
+
+function calculateCompareStats(quarterData) {
+    let subjectPerformances = [];
+    if (quarterData && quarterData.section) {
+        Object.keys(quarterData.section).forEach(subject => {
+            const percentage = calculateFinalPercentageForFriend(subject, quarterData);
+            if (percentage !== null && percentage >= 0) {
+                subjectPerformances.push({ name: subject, percentage: percentage, grade: getGradeFromPercentage(percentage) });
+            }
+        });
+    }
+    
+    if (subjectPerformances.length === 0) {
+        return { averagePercentage: 0, averageGrade: 0, bestSubject: null, worstSubject: null };
+    }
+    
+    const totalGrade = subjectPerformances.reduce((sum, p) => sum + p.grade, 0);
+    const totalPercentage = subjectPerformances.reduce((sum, p) => sum + p.percentage, 0);
+    const averageGrade = totalGrade / subjectPerformances.length;
+    const averagePercentage = totalPercentage / subjectPerformances.length;
+    const bestSubject = subjectPerformances.reduce((best, current) => current.percentage > best.percentage ? current : best, subjectPerformances[0]);
+    const worstSubject = subjectPerformances.reduce((worst, current) => current.percentage < worst.percentage ? current : worst, subjectPerformances[0]);
+    
+    return {
+        averagePercentage: averagePercentage,
+        averageGrade: averageGrade,
+        bestSubject: bestSubject ? `${bestSubject.name} (${bestSubject.percentage.toFixed(2)}%)` : null,
+        worstSubject: worstSubject ? `${worstSubject.name} (${worstSubject.percentage.toFixed(2)}%)` : null
+    };
+}
+
+function closeCompareView() {
+    document.getElementById('compare-view').classList.add('hidden');
+    navigateTo('users');
 }
