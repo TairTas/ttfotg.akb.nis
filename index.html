@@ -220,5 +220,36 @@
             <p id="announcement-text"></p>
         </div>
     </div>
+    
+    <div id="compare-modal-overlay" class="hidden">
+        <div id="compare-modal">
+            <button id="compare-modal-close-btn">&times;</button>
+            <h3>Выберите пользователя для сравнения</h3>
+            <div id="compare-user-select-container">
+                <input type="text" id="compare-search-input" placeholder="Введите имя пользователя">
+                <button id="compare-search-btn" class="button">Найти</button>
+                <div id="compare-search-results"></div>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                    <button class="button secondary" onclick="selectCompareUser('self')">Сравнить с собой</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="compare-view" class="hidden">
+        <div class="content-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3>Сравнение профилей</h3>
+                <button class="button secondary" onclick="closeCompareView()">Закрыть</button>
+            </div>
+            <div class="quarter-selector" id="compare-quarter-selector">
+                <button class="q-btn active" data-quarter="1">1</button>
+                <button class="q-btn" data-quarter="2">2</button>
+                <button class="q-btn" data-quarter="3">3</button>
+                <button class="q-btn" data-quarter="4">4</button>
+            </div>
+            <div id="compare-profiles-container" class="compare-profiles-container"></div>
+        </div>
+    </div>
 </body>
 </html>
