@@ -20,6 +20,9 @@ let postsRef = null;
 let postsListener = null;
 let allUsersDataCache = null;
 let postsViewedInSession = {};
+let currentForumCategory = 'chat'; // 'chat' или 'homework'
+let adminUsersListeners = {}; // Для отслеживания lastSeen в админ панели
+let currentAdminPostsCategory = 'chat'; // Для админ панели постов
 
 document.addEventListener('DOMContentLoaded', () => {
     const appContainer = document.getElementById('app-container');
@@ -39,6 +42,12 @@ document.addEventListener('DOMContentLoaded', () => {
             currentUser = user;
             authOverlay.classList.add('hidden');
             appContainer.classList.remove('hidden');
+            
+            // Обновляем время последней активности
+            updateUserLastSeen();
+            // Устанавливаем интервал для обновления каждые 30 секунд
+            setInterval(updateUserLastSeen, 30000);
+            
             loadUserData().then(() => { handleUrlParams(); });
         } else {
             currentUser = null;
@@ -210,6 +219,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     leaderboardFilter.addEventListener('change', renderLeaderboard);
+    
+    // Обработчик выбора четверти в лидерборде
+    document.getElementById('leaderboard-quarter-selector').addEventListener('click', (e) => {
+        if (e.target.classList.contains('q-btn')) {
+            document.querySelector('#leaderboard-quarter-selector .q-btn.active').classList.remove('active');
+            e.target.classList.add('active');
+            currentLeaderboardQuarter = e.target.dataset.quarter;
+            renderLeaderboard();
+        }
+    });
 
     profilePictureContainer.addEventListener('click', () => profilePictureInput.click());
     profilePictureInput.addEventListener('change', handleProfilePictureUpload);
@@ -219,6 +238,17 @@ document.addEventListener('DOMContentLoaded', () => {
     removePostImageButton.addEventListener('click', removeSelectedPostImage);
     
     document.getElementById('submit-post-btn').addEventListener('click', handlePostSubmit);
+    
+    // Обработчик переключения категорий форума
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('forum-category-btn')) {
+            const category = e.target.dataset.category;
+            document.querySelectorAll('.forum-category-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            currentForumCategory = category;
+            renderChatView();
+        }
+    });
 
     postsContainer.addEventListener('click', (e) => {
         const replyDeleteButton = e.target.closest('.reply-delete-btn');
@@ -274,18 +304,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('admin-tab-users').addEventListener('click', () => switchAdminTab('users'));
     document.getElementById('admin-tab-posts').addEventListener('click', () => switchAdminTab('posts'));
-    
-    // Добавляем обработчик для новой вкладки админа
-    const adminMessagesTab = document.createElement('div');
-    adminMessagesTab.id = 'admin-tab-messages';
-    adminMessagesTab.className = 'admin-tab';
-    adminMessagesTab.dataset.tab = 'messages';
-    adminMessagesTab.textContent = 'Сообщения';
-    document.querySelector('.admin-tabs').appendChild(adminMessagesTab);
-    adminMessagesTab.addEventListener('click', () => switchAdminTab('messages'));
+    document.getElementById('admin-tab-prefixes').addEventListener('click', () => switchAdminTab('prefixes'));
+    document.getElementById('admin-tab-messages').addEventListener('click', () => switchAdminTab('messages'));
 });
 
 // --- КОД ФУНКЦИЙ ---
+
+// НОВАЯ ГЛОБАЛЬНАЯ ФУНКЦИЯ для генерации HTML префиксов
+function generatePrefixesHtml(prefixes) {
+    if (!prefixes || !Array.isArray(prefixes) || prefixes.length === 0) {
+        return '';
+    }
+    return prefixes.map(url => `<img src="${url}" class="nickname-prefix" alt="prefix">`).join('');
+}
 
 function getNewQuarterData() {
     return JSON.parse(JSON.stringify({
@@ -298,6 +329,26 @@ function getFriendlyAuthError(errorCode) {
 }
 function saveData() { if (!currentUser) return; clearTimeout(saveDataTimeout); saveDataTimeout = setTimeout(() => { db.ref(`users/${currentUser.uid}/grades`).set(allGradesData); }, 1500); }
 function savePrivacySetting(isPublic) { if (!currentUser) return; db.ref(`users/${currentUser.uid}/profile/isPublic`).set(isPublic); }
+function updateUserLastSeen() {
+    if (!currentUser) return;
+    db.ref(`users/${currentUser.uid}/lastSeen`).set(firebase.database.ServerValue.TIMESTAMP);
+}
+function formatLastSeen(timestamp) {
+    if (!timestamp) return 'Никогда';
+    const now = Date.now();
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    
+    if (minutes < 1) return 'Только что';
+    if (minutes < 60) return `${minutes} ${minutes === 1 ? 'минуту' : minutes < 5 ? 'минуты' : 'минут'} назад`;
+    if (hours < 24) return `${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'} назад`;
+    if (days < 7) return `${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'} назад`;
+    
+    const date = new Date(timestamp);
+    return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
 function loadUserData() {
     return new Promise((resolve) => {
         if (!currentUser) return resolve();
@@ -311,8 +362,9 @@ function loadUserData() {
             const data = snapshot.val() || {};
             userProfile = data.profile || {};
             allGradesData = data.grades || {};
-            userDisplayNameElement.textContent = `Пользователь: ${userProfile.username || '...'}`;
-            profileUsername.textContent = userProfile.username || 'Имя не указано';
+            // Обновляем отображение имени пользователя с префиксами
+            userDisplayNameElement.innerHTML = `Пользователь: ${userProfile.username || '...'} ${generatePrefixesHtml(userProfile.prefixes)}`;
+            profileUsername.innerHTML = `${userProfile.username || 'Имя не указано'} ${generatePrefixesHtml(userProfile.prefixes)}`;
             profileClass.textContent = `Класс: ${userProfile.class || 'Не указан'}`;
             privacyCheckbox.checked = userProfile.isPublic === true;
             if (userProfile.photoURL) {
@@ -346,6 +398,7 @@ function navigateTo(viewName) {
         postsRef = null;
         postsListener = null;
     }
+    // Сбрасываем просмотренные посты только при выходе из форума
     if (viewName !== 'chat') {
         postsViewedInSession = {};
     }
@@ -360,6 +413,7 @@ function navigateTo(viewName) {
     if (viewName === 'leaderboard') { renderLeaderboard(); } 
     if (viewName === 'chat') { renderChatView(); } 
     if (viewName === 'admin') { renderAdminPanel(); }
+    if (viewName === 'users') { renderUsersView(); }
 }
 function renderStatisticsView(containerId, gradesData, isFriend = false) {
     const container = document.getElementById(containerId);
@@ -438,6 +492,194 @@ function searchAndDisplayUser(username, byLink = false) {
             renderFriendData(friendData, resultsContainer);
         });
     });
+}
+
+let allUsersByClass = {};
+
+async function renderUsersView() {
+    const classesContainer = document.getElementById('classes-container');
+    const usersListContainer = document.getElementById('users-list-container');
+    
+    classesContainer.innerHTML = '<p>Загрузка пользователей...</p>';
+    
+    try {
+        // Загружаем только публичных пользователей через правильный запрос
+        const usersRef = db.ref('users');
+        const publicUsersSnapshot = await usersRef.orderByChild('profile/isPublic').equalTo(true).once('value');
+        
+        // Также загружаем свой собственный профиль, если он приватный
+        let ownProfile = null;
+        if (currentUser) {
+            try {
+                const ownSnapshot = await db.ref(`users/${currentUser.uid}`).once('value');
+                if (ownSnapshot.exists()) {
+                    ownProfile = { uid: currentUser.uid, ...ownSnapshot.val() };
+                }
+            } catch (e) {
+                // Игнорируем ошибки при загрузке собственного профиля
+            }
+        }
+        
+        // Группируем пользователей по классам
+        allUsersByClass = {};
+        const classOrder = ['7a', '7b', '7c', '7d', '7e', '7f', '7g', '7h', '7i', '7j'];
+        
+        // Создаем Set для отслеживания уже добавленных UID
+        const addedUids = new Set();
+        
+        // Добавляем публичных пользователей
+        if (publicUsersSnapshot.exists()) {
+            publicUsersSnapshot.forEach(childSnapshot => {
+                const user = childSnapshot.val();
+                if (!user.profile || !user.profile.class) return;
+                
+                const userClass = user.profile.class.toLowerCase().trim();
+                const uid = childSnapshot.key;
+                
+                // Проверяем, не добавлен ли уже этот пользователь
+                if (!addedUids.has(uid)) {
+                    if (!allUsersByClass[userClass]) {
+                        allUsersByClass[userClass] = [];
+                    }
+                    allUsersByClass[userClass].push({
+                        uid: uid,
+                        ...user
+                    });
+                    addedUids.add(uid);
+                }
+            });
+        }
+        
+        // Добавляем свой профиль, если он еще не добавлен (независимо от того, публичный он или приватный)
+        if (ownProfile && ownProfile.profile && ownProfile.profile.class) {
+            const userClass = ownProfile.profile.class.toLowerCase().trim();
+            if (!addedUids.has(ownProfile.uid)) {
+                if (!allUsersByClass[userClass]) {
+                    allUsersByClass[userClass] = [];
+                }
+                allUsersByClass[userClass].push(ownProfile);
+                addedUids.add(ownProfile.uid);
+            }
+        }
+        
+        // Сортируем пользователей в каждом классе по имени
+        Object.keys(allUsersByClass).forEach(className => {
+            allUsersByClass[className].sort((a, b) => 
+                (a.profile.username || '').localeCompare(b.profile.username || '')
+            );
+        });
+        
+        // Отображаем классы
+        let classesHtml = '';
+        classOrder.forEach(className => {
+            const count = allUsersByClass[className] ? allUsersByClass[className].length : 0;
+            classesHtml += `
+                <div class="class-card" data-class="${className}">
+                    <div class="class-name">${className.toUpperCase()}</div>
+                    <div class="class-count">${count} ${count === 1 ? 'человек' : count < 5 ? 'человека' : 'человек'}</div>
+                </div>
+            `;
+        });
+        
+        classesContainer.innerHTML = classesHtml;
+        
+        // Добавляем обработчики кликов на классы
+        classesContainer.querySelectorAll('.class-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const selectedClass = card.dataset.class;
+                document.querySelectorAll('.class-card').forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+                renderUsersForClass(selectedClass);
+            });
+        });
+        
+        usersListContainer.classList.add('hidden');
+        
+    } catch (error) {
+        console.error("Ошибка при загрузке пользователей:", error);
+        classesContainer.innerHTML = '<p>Не удалось загрузить пользователей.</p>';
+    }
+}
+
+function renderUsersForClass(className) {
+    const usersListContainer = document.getElementById('users-list-container');
+    const users = allUsersByClass[className] || [];
+    
+    if (users.length === 0) {
+        usersListContainer.innerHTML = '<p>В этом классе нет пользователей.</p>';
+        usersListContainer.classList.remove('hidden');
+        return;
+    }
+    
+    let usersHtml = `
+        <div class="users-list-header">
+            <h4>Пользователи класса ${className.toUpperCase()}</h4>
+            <button class="button secondary" onclick="document.getElementById('users-list-container').classList.add('hidden'); document.querySelectorAll('.class-card').forEach(c => c.classList.remove('active'));">Скрыть</button>
+        </div>
+        <div class="users-grid">
+    `;
+    
+    users.forEach(user => {
+        const photoURL = user.profile.photoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png';
+        const prefixesHtml = generatePrefixesHtml(user.profile.prefixes || []);
+        usersHtml += `
+            <div class="user-card" data-uid="${user.uid}" data-username="${user.profile.username}">
+                <img src="${photoURL}" alt="${user.profile.username}">
+                <div class="user-card-info">
+                    <div class="user-card-name">${user.profile.username} ${prefixesHtml}</div>
+                    <div class="user-card-class">${user.profile.class}</div>
+                </div>
+            </div>
+        `;
+    });
+    
+    usersHtml += '</div>';
+    usersListContainer.innerHTML = usersHtml;
+    usersListContainer.classList.remove('hidden');
+    
+    // Добавляем обработчики кликов на пользователей
+    usersListContainer.querySelectorAll('.user-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const uid = card.dataset.uid;
+            const username = card.dataset.username;
+            handleUserCardClick(uid, username);
+        });
+    });
+}
+
+async function handleUserCardClick(uid, username) {
+    const resultsContainer = document.getElementById('friend-results-container');
+    resultsContainer.innerHTML = '<p class="no-data-message">Загрузка...</p>';
+    
+    try {
+        const userSnapshot = await db.ref(`users/${uid}`).once('value');
+        if (!userSnapshot.exists()) {
+            resultsContainer.innerHTML = '<p class="no-data-message">Пользователь не найден.</p>';
+            return;
+        }
+        
+        const friendData = userSnapshot.val();
+        if (!friendData || !friendData.profile) {
+            resultsContainer.innerHTML = '<p class="no-data-message">Данные пользователя не найдены.</p>';
+            return;
+        }
+        
+        // Проверяем приватность профиля
+        if (!friendData.profile.isPublic) {
+            resultsContainer.innerHTML = '<p class="no-data-message">Этот аккаунт приватный. Вы не можете просматривать его данные.</p>';
+            return;
+        }
+        
+        // Если профиль публичный, показываем данные
+        renderFriendData(friendData, resultsContainer);
+        
+        // Прокручиваем к результатам поиска
+        resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+    } catch (error) {
+        console.error("Ошибка при загрузке данных пользователя:", error);
+        resultsContainer.innerHTML = '<p class="no-data-message">Не удалось загрузить данные пользователя.</p>';
+    }
 }
 function handleUrlParams() { const params = new URLSearchParams(window.location.search); const userToSearch = params.get('user'); if (userToSearch) { navigateTo('users'); document.getElementById('search-username-input').value = userToSearch; searchAndDisplayUser(userToSearch, true); history.replaceState(null, '', window.location.pathname); } }
 function getGradeFromPercentage(percentage) { if (percentage === null) return '-'; const roundedPercentage = Math.round(percentage); if (roundedPercentage >= 85) return 5; if (roundedPercentage >= 65) return 4; if (roundedPercentage >= 40) return 3; return 2; }
@@ -564,7 +806,7 @@ function renderFriendData(friendData, container) {
         <div class="friend-profile-header">
             <img src="${friendProfile.photoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" alt="Фото профиля ${friendProfile.username}">
             <div>
-                <h3>Профиль: ${friendProfile.username}</h3>
+                <h3>Профиль: ${friendProfile.username} ${generatePrefixesHtml(friendProfile.prefixes)}</h3>
                 <p>Класс: ${friendProfile.class || 'Не указан'}</p>
             </div>
         </div>
@@ -601,9 +843,14 @@ function isQuarterComplete(quarter) {
         if (gradeType) {
             for (const subjectKey in gradeType) {
                 const subject = gradeType[subjectKey];
-                for (const task of subject) {
-                    if (task.userResult === '' || task.userResult === null || task.userResult === undefined) {
-                        return false;
+                if (Array.isArray(subject)) {
+                    for (const task of subject) {
+                        const result = task.userResult;
+                        // Проверяем, что результат заполнен (не пустая строка, не null, не undefined)
+                        // 0 - это валидное значение, поэтому не проверяем его
+                        if (result === '' || result === null || result === undefined) {
+                            return false;
+                        }
                     }
                 }
             }
@@ -612,25 +859,48 @@ function isQuarterComplete(quarter) {
     return true;
 }
 
-function userHasAllGrades(gradesData) {
+function userHasAllGrades(gradesData, selectedQuarter = null) {
     if (!gradesData || Object.keys(gradesData).length === 0) {
         return false;
     }
-    let hasStartedAtLeastOneQuarter = false;
-    for (const qKey in gradesData) {
-        if (gradesData.hasOwnProperty(qKey)) {
-            hasStartedAtLeastOneQuarter = true;
-            if (!isQuarterComplete(gradesData[qKey])) {
-                return false;
+    
+    // Если выбрана конкретная четверть, проверяем только её
+    if (selectedQuarter !== null) {
+        const qKey = `q${selectedQuarter}`;
+        if (gradesData.hasOwnProperty(qKey) && gradesData[qKey]) {
+            const quarter = gradesData[qKey];
+            const hasAnyData = quarter.section && Object.keys(quarter.section).length > 0;
+            if (hasAnyData) {
+                return isQuarterComplete(quarter);
+            }
+        }
+        return false;
+    }
+    
+    // Если четверть не выбрана, проверяем все существующие четверти
+    // Пользователь проходит фильтр, если хотя бы одна четверть полностью заполнена
+    const quarters = ['q1', 'q2', 'q3', 'q4'];
+    let hasAtLeastOneCompleteQuarter = false;
+    
+    for (const qKey of quarters) {
+        if (gradesData.hasOwnProperty(qKey) && gradesData[qKey]) {
+            const quarter = gradesData[qKey];
+            const hasAnyData = quarter.section && Object.keys(quarter.section).length > 0;
+            
+            if (hasAnyData && isQuarterComplete(quarter)) {
+                hasAtLeastOneCompleteQuarter = true;
+                break; // Достаточно одной полностью заполненной четверти
             }
         }
     }
-    return hasStartedAtLeastOneQuarter;
+    
+    return hasAtLeastOneCompleteQuarter;
 }
 
 async function renderLeaderboard() {
     const container = document.getElementById('leaderboard-table-container');
     const filterEnabled = document.getElementById('leaderboard-filter-complete').checked;
+    const selectedQuarter = currentLeaderboardQuarter === 'all' ? null : parseInt(currentLeaderboardQuarter, 10);
     container.innerHTML = '<p>Загрузка данных...</p>';
 
     try {
@@ -649,15 +919,17 @@ async function renderLeaderboard() {
                 return;
             }
 
-            if (filterEnabled && !userHasAllGrades(user.grades || {})) {
+            // Проверяем фильтр с учетом выбранной четверти
+            if (filterEnabled && !userHasAllGrades(user.grades || {}, selectedQuarter)) {
                 return;
             }
 
             if (user.grades) {
-                const stats = calculateOverallStats(user.grades);
+                const stats = calculateOverallStats(user.grades, selectedQuarter);
                 if (stats.averagePercentage > 0) { 
                     leaderboardData.push({
                         username: user.profile.username,
+                        prefixes: user.profile.prefixes || [],
                         averagePercentage: stats.averagePercentage,
                         averageGrade: stats.averageGrade
                     });
@@ -666,7 +938,8 @@ async function renderLeaderboard() {
         });
 
         if (leaderboardData.length === 0) {
-            container.innerHTML = filterEnabled ? '<p>Нет пользователей, заполнивших все оценки.</p>' : '<p>Нет пользователей с введенными оценками.</p>';
+            const quarterText = selectedQuarter ? ` за ${selectedQuarter} четверть` : '';
+            container.innerHTML = filterEnabled ? `<p>Нет пользователей, заполнивших все оценки${quarterText}.</p>` : `<p>Нет пользователей с введенными оценками${quarterText}.</p>`;
             return;
         }
 
@@ -678,9 +951,10 @@ async function renderLeaderboard() {
             }
         });
 
+        const quarterText = selectedQuarter ? ` (${selectedQuarter} четверть)` : '';
         let tableHTML = `<div class="table-wrapper"><table class="leaderboard-table"><thead><tr><th class="rank-col">#</th><th>Пользователь</th><th class="number-col">Средний %</th><th class="number-col">Средняя оценка</th></tr></thead><tbody>`;
         leaderboardData.forEach((player, index) => {
-            tableHTML += `<tr><td class="rank-col">${index + 1}</td><td>${player.username}</td><td class="number-col">${player.averagePercentage.toFixed(2)} %</td><td class="number-col">${player.averageGrade.toFixed(2)}</td></tr>`;
+            tableHTML += `<tr><td class="rank-col">${index + 1}</td><td>${player.username} ${generatePrefixesHtml(player.prefixes)}</td><td class="number-col">${player.averagePercentage.toFixed(2)} %</td><td class="number-col">${player.averageGrade.toFixed(2)}</td></tr>`;
         });
         tableHTML += `</tbody></table></div>`;
         container.innerHTML = tableHTML;
@@ -691,7 +965,55 @@ async function renderLeaderboard() {
     }
 }
 
-function calculateOverallStats(gradesData) { const allPercentages = []; const allGrades = []; for (const quarterKey in gradesData) { if (gradesData.hasOwnProperty(quarterKey)) { const quarterData = gradesData[quarterKey]; if (quarterData && quarterData.section) { for (const subjectName in quarterData.section) { if (quarterData.section.hasOwnProperty(subjectName)) { const percentage = calculateFinalPercentageForFriend(subjectName, quarterData); if (percentage !== null && percentage >= 0) { allPercentages.push(percentage); allGrades.push(getGradeFromPercentage(percentage)); } } } } } } if (allPercentages.length === 0) { return { averagePercentage: 0, averageGrade: 0 }; } const avgPercentage = allPercentages.reduce((a, b) => a + b, 0) / allPercentages.length; const avgGrade = allGrades.reduce((a, b) => a + b, 0) / allGrades.length; return { averagePercentage: avgPercentage, averageGrade: avgGrade }; }
+function calculateOverallStats(gradesData, selectedQuarter = null) {
+    const allPercentages = [];
+    const allGrades = [];
+    
+    if (selectedQuarter !== null) {
+        // Если выбрана конкретная четверть, считаем только её
+        const qKey = `q${selectedQuarter}`;
+        if (gradesData.hasOwnProperty(qKey) && gradesData[qKey]) {
+            const quarterData = gradesData[qKey];
+            if (quarterData && quarterData.section) {
+                for (const subjectName in quarterData.section) {
+                    if (quarterData.section.hasOwnProperty(subjectName)) {
+                        const percentage = calculateFinalPercentageForFriend(subjectName, quarterData);
+                        if (percentage !== null && percentage >= 0) {
+                            allPercentages.push(percentage);
+                            allGrades.push(getGradeFromPercentage(percentage));
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        // Если выбраны все четверти, считаем все
+        for (const quarterKey in gradesData) {
+            if (gradesData.hasOwnProperty(quarterKey)) {
+                const quarterData = gradesData[quarterKey];
+                if (quarterData && quarterData.section) {
+                    for (const subjectName in quarterData.section) {
+                        if (quarterData.section.hasOwnProperty(subjectName)) {
+                            const percentage = calculateFinalPercentageForFriend(subjectName, quarterData);
+                            if (percentage !== null && percentage >= 0) {
+                                allPercentages.push(percentage);
+                                allGrades.push(getGradeFromPercentage(percentage));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    if (allPercentages.length === 0) {
+        return { averagePercentage: 0, averageGrade: 0 };
+    }
+    
+    const avgPercentage = allPercentages.reduce((a, b) => a + b, 0) / allPercentages.length;
+    const avgGrade = allGrades.reduce((a, b) => a + b, 0) / allGrades.length;
+    return { averagePercentage: avgPercentage, averageGrade: avgGrade };
+}
 async function handlePostSubmit() {
     const postTextInput = document.getElementById('post-text-input');
     const isAnonymous = document.getElementById('post-anonymous-checkbox').checked;
@@ -721,12 +1043,16 @@ async function handlePostSubmit() {
         text: text,
         isAnonymous: isAnonymous,
         timestamp: firebase.database.ServerValue.TIMESTAMP,
-        authorPhotoURL: isAnonymous ? 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png' : (userProfile.photoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png')
+        authorPhotoURL: isAnonymous ? 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png' : (userProfile.photoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'),
+        // Сохраняем префиксы на момент публикации
+        authorPrefixes: isAnonymous ? [] : (userProfile.prefixes || [])
     };
     if (imageURL) {
         postData.imageURL = imageURL;
     }
-    db.ref('posts').push(postData)
+    // Выбираем правильную базу данных в зависимости от категории
+    const postsRef = currentForumCategory === 'homework' ? db.ref('homeworkPosts') : db.ref('posts');
+    postsRef.push(postData)
         .then(() => {
             postTextInput.value = '';
             document.getElementById('post-anonymous-checkbox').checked = false;
@@ -741,12 +1067,26 @@ async function handlePostSubmit() {
             submitBtn.disabled = false;
         });
 }
-function handleDeletePost(postId) { db.ref('posts/' + postId).remove().catch(error => { console.error("Ошибка при удалении поста:", error); alert("Не удалось удалить пост. У вас может не быть прав на это действие."); }); }
+function handleDeletePost(postId) { 
+    const postsRef = currentForumCategory === 'homework' ? db.ref('homeworkPosts') : db.ref('posts');
+    postsRef.child(postId).remove().catch(error => { 
+        console.error("Ошибка при удалении поста:", error); 
+        alert("Не удалось удалить пост. У вас может не быть прав на это действие."); 
+    }); 
+}
 function formatTimestamp(ts) { const date = new Date(ts); return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 
 function renderChatView() {
     const postsContainer = document.getElementById('posts-container');
-    postsRef = db.ref('posts').orderByChild('timestamp').limitToLast(100);
+    
+    // Отключаем предыдущий listener, если он существует
+    if (postsRef && postsListener) {
+        postsRef.off('value', postsListener);
+    }
+    
+    // Выбираем правильную базу данных в зависимости от категории
+    const postsPath = currentForumCategory === 'homework' ? 'homeworkPosts' : 'posts';
+    postsRef = db.ref(postsPath).orderByChild('timestamp').limitToLast(100);
 
     postsListener = (snapshot) => {
         postsContainer.innerHTML = '';
@@ -762,9 +1102,10 @@ function renderChatView() {
         
         let postsHtml = '';
         postsData.reverse().forEach(post => {
-            if (currentUser && !postsViewedInSession[post.id]) {
-                postsViewedInSession[post.id] = true;
-                db.ref(`posts/${post.id}/views/${currentUser.uid}`).set(true);
+            const postKey = `${postsPath}_${post.id}`;
+            if (currentUser && !postsViewedInSession[postKey]) {
+                postsViewedInSession[postKey] = true;
+                db.ref(`${postsPath}/${post.id}/views/${currentUser.uid}`).set(true);
             }
 
             const likes = post.likes || {};
@@ -793,12 +1134,15 @@ function renderChatView() {
                     const canDeleteReply = currentUser && (reply.uid === currentUser.uid || userProfile.isAdmin);
                     const replyDeleteBtnHtml = canDeleteReply ? `<button class="reply-delete-btn" data-post-id="${post.id}" data-reply-id="${replyId}">&times;</button>` : '';
 
+                    // Отображаем префиксы в ответах
+                    const replyPrefixesHtml = generatePrefixesHtml(reply.authorPrefixes);
+
                     repliesHtml += `
                         <div class="reply-card">
                             <img src="${reply.authorPhotoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" class="reply-avatar">
                             <div class="reply-content">
                                 ${replyDeleteBtnHtml}
-                                <span class="reply-author">${reply.username}</span>
+                                <span class="reply-author">${reply.username} ${replyPrefixesHtml}</span>
                                 <p class="reply-text">${reply.text}</p>
                                 <div class="reply-actions">
                                      <button class="reply-like-btn action-btn ${isReplyLiked ? 'liked' : ''}" data-post-id="${post.id}" data-reply-id="${replyId}">
@@ -814,9 +1158,11 @@ function renderChatView() {
                 repliesHtml += '</div>';
             }
 
+            // Отображаем префиксы в постах
+            const postPrefixesHtml = generatePrefixesHtml(post.authorPrefixes);
             let authorHtml = post.isAnonymous 
                 ? `<span class="post-author anonymous">${post.username}</span>`
-                : `<span class="post-author clickable-username" data-username="${post.username}">${post.username}</span>`;
+                : `<span class="post-author clickable-username" data-username="${post.username}">${post.username}</span> ${postPrefixesHtml}`;
             
             const deleteButtonHtml = (currentUser && (post.uid === currentUser.uid || userProfile.isAdmin)) ? `<button class="post-delete-btn" data-post-id="${post.id}">&times;</button>` : '';
             const postImageHtml = post.imageURL ? `<img src="${post.imageURL}" class="post-image" alt="Прикрепленное изображение">` : '';
@@ -862,13 +1208,15 @@ function renderChatView() {
 
 function handleLikeToggle(postId) {
     if (!currentUser) return;
-    const likeRef = db.ref(`posts/${postId}/likes/${currentUser.uid}`);
+    const postsPath = currentForumCategory === 'homework' ? 'homeworkPosts' : 'posts';
+    const likeRef = db.ref(`${postsPath}/${postId}/likes/${currentUser.uid}`);
     likeRef.transaction(currentData => (currentData ? null : true));
 }
 
 function handleReplyLikeToggle(postId, replyId) {
     if (!currentUser) return;
-    const likeRef = db.ref(`posts/${postId}/replies/${replyId}/likes/${currentUser.uid}`);
+    const postsPath = currentForumCategory === 'homework' ? 'homeworkPosts' : 'posts';
+    const likeRef = db.ref(`${postsPath}/${postId}/replies/${replyId}/likes/${currentUser.uid}`);
     likeRef.transaction(currentData => (currentData ? null : true));
 }
 
@@ -882,15 +1230,19 @@ function handleReplySubmit(postId) {
         username: userProfile.username,
         text: text,
         timestamp: firebase.database.ServerValue.TIMESTAMP,
-        authorPhotoURL: userProfile.photoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'
+        authorPhotoURL: userProfile.photoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png',
+        // Сохраняем префиксы на момент ответа
+        authorPrefixes: userProfile.prefixes || []
     };
-    db.ref(`posts/${postId}/replies`).push(replyData)
+    const postsPath = currentForumCategory === 'homework' ? 'homeworkPosts' : 'posts';
+    db.ref(`${postsPath}/${postId}/replies`).push(replyData)
         .then(() => { replyInput.value = ''; })
         .catch(error => { console.error("Ошибка при отправке ответа:", error); alert("Не удалось отправить ответ."); });
 }
 
 function handleDeleteReply(postId, replyId) {
-    db.ref(`posts/${postId}/replies/${replyId}`).remove()
+    const postsPath = currentForumCategory === 'homework' ? 'homeworkPosts' : 'posts';
+    db.ref(`${postsPath}/${postId}/replies/${replyId}`).remove()
         .catch(error => { console.error("Ошибка при удалении ответа:", error); alert("Не удалось удалить ответ."); });
 }
 
@@ -1022,12 +1374,24 @@ function switchAdminTab(tabName) {
     const container = document.getElementById('admin-content-container');
     container.innerHTML = '<p>Загрузка данных...</p>';
 
+    // Отключаем listeners при переключении вкладок
+    if (tabName !== 'users') {
+        Object.values(adminUsersListeners).forEach(listener => {
+            if (listener && listener.ref && listener.callback) {
+                listener.ref.off('value', listener.callback);
+            }
+        });
+        adminUsersListeners = {};
+    }
+
     if (tabName === 'users') {
         renderAdminUsersTab();
     } else if (tabName === 'posts') {
         renderAdminPostsTab();
     } else if (tabName === 'messages') {
         renderAdminMessagesTab();
+    } else if (tabName === 'prefixes') {
+        renderAdminPrefixesTab();
     }
 }
 
@@ -1036,37 +1400,64 @@ async function renderAdminUsersTab() {
     container.innerHTML = '<p>Загрузка списка пользователей...</p>';
 
     try {
-        const usernamesSnapshot = await db.ref('usernames').once('value');
-        if (!usernamesSnapshot.exists()) {
-            container.innerHTML = '<p>Пользователи не найдены.</p>';
-            return;
-        }
-        const usernames = usernamesSnapshot.val();
-        if (!usernames) {
-             container.innerHTML = '<p>Пользователи не найдены.</p>';
-            return;
-        }
-        const uidsToFetch = Object.values(usernames).filter(uid => uid);
-
-        const userPromises = uidsToFetch.map(uid => db.ref('users/' + uid).once('value'));
-        const userSnapshots = await Promise.all(userPromises);
-
-        allUsersDataCache = {};
-        userSnapshots.forEach(snapshot => {
-            if (snapshot.exists()) {
-                allUsersDataCache[snapshot.key] = snapshot.val();
+        // Проверяем, является ли пользователь админом
+        let isAdmin = false;
+        if (currentUser) {
+            try {
+                const idTokenResult = await currentUser.getIdTokenResult();
+                isAdmin = !!idTokenResult.claims.admin;
+            } catch (e) {
+                console.error("Ошибка при проверке прав админа:", e);
             }
-        });
+        }
+
+        // Если админ, загружаем всех пользователей напрямую через users
+        // Если не админ, используем запрос только для публичных
+        if (isAdmin) {
+            // Админ может видеть всех пользователей напрямую
+            const usersSnapshot = await db.ref('users').once('value');
+            if (usersSnapshot.exists()) {
+                allUsersDataCache = {};
+                usersSnapshot.forEach(childSnapshot => {
+                    allUsersDataCache[childSnapshot.key] = childSnapshot.val();
+                });
+            } else {
+                allUsersDataCache = {};
+            }
+        } else {
+            // Не админ - только публичные профили через запрос
+            const usersRef = db.ref('users');
+            const publicUsersSnapshot = await usersRef.orderByChild('profile/isPublic').equalTo(true).once('value');
+            
+            allUsersDataCache = {};
+            if (publicUsersSnapshot.exists()) {
+                publicUsersSnapshot.forEach(childSnapshot => {
+                    allUsersDataCache[childSnapshot.key] = childSnapshot.val();
+                });
+            }
+        }
 
         if (Object.keys(allUsersDataCache).length === 0) {
              container.innerHTML = '<p>Не удалось загрузить данные профилей.</p>';
              return;
         }
 
+        // Отключаем предыдущие listeners
+        Object.values(adminUsersListeners).forEach(listener => {
+            if (listener && listener.ref && listener.callback) {
+                listener.ref.off('value', listener.callback);
+            }
+        });
+        adminUsersListeners = {};
+        
         let usersHtml = '';
         for (const uid in allUsersDataCache) {
             const user = allUsersDataCache[uid];
             if (!user.profile) continue;
+            
+            // Добавляем префиксы в отображение
+            const prefixesHtml = generatePrefixesHtml(user.profile.prefixes);
+            const lastSeenText = formatLastSeen(user.lastSeen);
 
             usersHtml += `
                 <div class="admin-user-card" id="admin-user-${uid}">
@@ -1074,9 +1465,10 @@ async function renderAdminUsersTab() {
                         <div class="admin-user-info">
                             <img src="${user.profile.photoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" alt="Фото профиля">
                             <div class="admin-user-details">
-                                <p><strong>Имя:</strong> ${user.profile.username}</p>
+                                <p><strong>Имя:</strong> ${user.profile.username} ${prefixesHtml}</p>
                                 <p><strong>Класс:</strong> ${user.profile.class}</p>
                                 <p class="email-info"><strong>Email:</strong> ${user.profile.email}</p>
+                                <p class="last-seen-info"><strong>Последний раз в сети:</strong> <span id="last-seen-${uid}">${lastSeenText}</span></p>
                                 <p class="password-warning"><strong>Пароль:</strong> Недоступен для просмотра из соображений безопасности.</p>
                             </div>
                         </div>
@@ -1099,6 +1491,22 @@ async function renderAdminUsersTab() {
                     </div>
                 </div>
             `;
+            
+            // Устанавливаем listener для отслеживания lastSeen в реальном времени
+            const lastSeenRef = db.ref(`users/${uid}/lastSeen`);
+            const lastSeenCallback = (snapshot) => {
+                const lastSeenElement = document.getElementById(`last-seen-${uid}`);
+                if (lastSeenElement) {
+                    const timestamp = snapshot.val();
+                    lastSeenElement.textContent = formatLastSeen(timestamp);
+                    // Обновляем кеш
+                    if (allUsersDataCache[uid]) {
+                        allUsersDataCache[uid].lastSeen = timestamp;
+                    }
+                }
+            };
+            lastSeenRef.on('value', lastSeenCallback);
+            adminUsersListeners[uid] = { ref: lastSeenRef, callback: lastSeenCallback };
         }
         container.innerHTML = usersHtml;
     } catch (error) {
@@ -1334,9 +1742,18 @@ async function renderAdminPostsTab() {
              container.innerHTML = '<p>Загрузка постов...</p>';
         }
 
-        const postsSnapshot = await db.ref('posts').orderByChild('timestamp').once('value');
+        // Добавляем переключатель категорий
+        const categorySelector = `
+            <div class="forum-categories" style="margin-bottom: 20px;">
+                <button class="forum-category-btn ${currentAdminPostsCategory === 'chat' ? 'active' : ''}" data-category="chat" onclick="switchAdminPostsCategory('chat')">Чат</button>
+                <button class="forum-category-btn ${currentAdminPostsCategory === 'homework' ? 'active' : ''}" data-category="homework" onclick="switchAdminPostsCategory('homework')">ДЗ</button>
+            </div>
+        `;
+
+        const postsPath = currentAdminPostsCategory === 'homework' ? 'homeworkPosts' : 'posts';
+        const postsSnapshot = await db.ref(postsPath).orderByChild('timestamp').once('value');
         if (!postsSnapshot.exists()) {
-            container.innerHTML = '<p>Постов нет.</p>';
+            container.innerHTML = categorySelector + '<p>Постов нет.</p>';
             return;
         }
 
@@ -1403,16 +1820,22 @@ async function renderAdminPostsTab() {
                 </div>
             `;
         });
-        container.innerHTML = postsHtml;
+        container.innerHTML = categorySelector + postsHtml;
     } catch (error) {
         console.error("Ошибка при загрузке постов:", error);
-        container.innerHTML = '<p>Не удалось загрузить посты.</p>';
+        container.innerHTML = categorySelector + '<p>Не удалось загрузить посты.</p>';
     }
+}
+
+function switchAdminPostsCategory(category) {
+    currentAdminPostsCategory = category;
+    renderAdminPostsTab();
 }
 
 function adminDeletePost(postId) {
     if (!confirm("Вы уверены, что хотите удалить этот пост?")) return;
-    db.ref('posts/' + postId).remove()
+    const postsPath = currentAdminPostsCategory === 'homework' ? 'homeworkPosts' : 'posts';
+    db.ref(`${postsPath}/${postId}`).remove()
         .then(() => {
             alert("Пост удален.");
             document.getElementById(`admin-post-${postId}`)?.remove();
@@ -1425,7 +1848,8 @@ function adminDeletePost(postId) {
 
 function adminDeleteReply(postId, replyId) {
     if (!confirm("Вы уверены, что хотите удалить этот ответ?")) return;
-    db.ref(`posts/${postId}/replies/${replyId}`).remove()
+    const postsPath = currentAdminPostsCategory === 'homework' ? 'homeworkPosts' : 'posts';
+    db.ref(`${postsPath}/${postId}/replies/${replyId}`).remove()
         .then(() => {
             alert("Ответ удален.");
             document.getElementById(`admin-reply-${replyId}`)?.remove();
@@ -1435,6 +1859,180 @@ function adminDeleteReply(postId, replyId) {
             alert("Не удалось удалить ответ.");
         });
 }
+
+// --- НОВЫЕ ФУНКЦИИ ДЛЯ ПРЕФИКСОВ ---
+async function renderAdminPrefixesTab() {
+    const container = document.getElementById('admin-content-container');
+    
+    if (!allUsersDataCache) {
+        await renderAdminUsersTab();
+        renderAdminPrefixesTab();
+        return;
+    }
+
+    let userOptions = '<option value="">-- Выберите пользователя --</option>';
+    const sortedUsers = Object.entries(allUsersDataCache).sort((a, b) => 
+        a[1].profile.username.localeCompare(b[1].profile.username)
+    );
+
+    for (const [uid, user] of sortedUsers) {
+        if (user.profile) {
+            userOptions += `<option value="${uid}">${user.profile.username}</option>`;
+        }
+    }
+
+    container.innerHTML = `
+        <div class="admin-prefix-manager">
+            <div class="admin-prefix-controls">
+                <label for="admin-prefix-user-select">Пользователь:</label>
+                <select id="admin-prefix-user-select">${userOptions}</select>
+            </div>
+            
+            <div id="admin-current-prefixes">
+                <p>Текущие префиксы:</p>
+                <div id="admin-current-prefixes-list">
+                    <span class="text-muted">Сначала выберите пользователя</span>
+                </div>
+            </div>
+
+            <div id="admin-add-prefix-form" class="hidden">
+                <p><strong>Добавить новый префикс:</strong></p>
+                <div id="admin-add-prefix-form-controls">
+                    <input type="file" id="admin-prefix-file-input" accept=".png">
+                    <button id="admin-prefix-add-btn" class="button">Загрузить и добавить</button>
+                </div>
+                <img id="admin-prefix-preview" class="hidden" src="#" alt="Предпросмотр префикса">
+            </div>
+        </div>
+    `;
+
+    document.getElementById('admin-prefix-user-select').addEventListener('change', (e) => {
+        displayPrefixesForUser(e.target.value);
+    });
+
+    document.getElementById('admin-prefix-file-input').addEventListener('change', (e) => {
+        const preview = document.getElementById('admin-prefix-preview');
+        const file = e.target.files[0];
+        if (file) {
+            preview.src = URL.createObjectURL(file);
+            preview.classList.remove('hidden');
+        } else {
+            preview.classList.add('hidden');
+        }
+    });
+
+    document.getElementById('admin-prefix-add-btn').addEventListener('click', handleAdminPrefixUpload);
+}
+
+function displayPrefixesForUser(uid) {
+    const listContainer = document.getElementById('admin-current-prefixes-list');
+    const form = document.getElementById('admin-add-prefix-form');
+    
+    if (!uid) {
+        listContainer.innerHTML = '<span class="text-muted">Сначала выберите пользователя</span>';
+        form.classList.add('hidden');
+        return;
+    }
+
+    form.classList.remove('hidden');
+    const user = allUsersDataCache[uid];
+    const prefixes = user?.profile?.prefixes || [];
+
+    if (prefixes.length === 0) {
+        listContainer.innerHTML = '<span class="text-muted">У этого пользователя нет префиксов.</span>';
+        return;
+    }
+
+    listContainer.innerHTML = prefixes.map((url, index) => `
+        <div class="admin-prefix-item">
+            <img src="${url}" alt="Префикс ${index + 1}">
+            <button class="admin-prefix-delete-btn" onclick="adminDeletePrefix('${uid}', ${index})">&times;</button>
+        </div>
+    `).join('');
+}
+
+async function handleAdminPrefixUpload() {
+    const userSelect = document.getElementById('admin-prefix-user-select');
+    const fileInput = document.getElementById('admin-prefix-file-input');
+    const addButton = document.getElementById('admin-prefix-add-btn');
+    const uid = userSelect.value;
+    const file = fileInput.files[0];
+
+    if (!uid) {
+        alert('Пожалуйста, выберите пользователя.');
+        return;
+    }
+    if (!file) {
+        alert('Пожалуйста, выберите PNG файл для загрузки.');
+        return;
+    }
+    if (file.type !== 'image/png') {
+        alert('Можно загружать только файлы в формате PNG.');
+        return;
+    }
+
+    addButton.disabled = true;
+    addButton.classList.add('loading');
+
+    try {
+        const imageURL = await uploadToCloudinary(file);
+        
+        const userPrefixesRef = db.ref(`users/${uid}/profile/prefixes`);
+        const snapshot = await userPrefixesRef.once('value');
+        const currentPrefixes = snapshot.val() || [];
+        
+        currentPrefixes.push(imageURL);
+        
+        await userPrefixesRef.set(currentPrefixes);
+        
+        // Обновляем кеш
+        if (allUsersDataCache[uid] && allUsersDataCache[uid].profile) {
+            allUsersDataCache[uid].profile.prefixes = currentPrefixes;
+        }
+
+        alert('Префикс успешно добавлен!');
+        fileInput.value = ''; // Сброс инпута
+        document.getElementById('admin-prefix-preview').classList.add('hidden');
+        displayPrefixesForUser(uid); // Обновляем отображение
+
+    } catch (error) {
+        console.error('Ошибка при добавлении префикса:', error);
+        alert('Не удалось добавить префикс.');
+    } finally {
+        addButton.disabled = false;
+        addButton.classList.remove('loading');
+    }
+}
+
+async function adminDeletePrefix(uid, index) {
+    if (!confirm(`Вы уверены, что хотите удалить этот префикс?`)) {
+        return;
+    }
+    
+    try {
+        const userPrefixesRef = db.ref(`users/${uid}/profile/prefixes`);
+        const snapshot = await userPrefixesRef.once('value');
+        let currentPrefixes = snapshot.val() || [];
+        
+        if (index >= 0 && index < currentPrefixes.length) {
+            currentPrefixes.splice(index, 1);
+        }
+
+        await userPrefixesRef.set(currentPrefixes);
+
+        if (allUsersDataCache[uid] && allUsersDataCache[uid].profile) {
+            allUsersDataCache[uid].profile.prefixes = currentPrefixes;
+        }
+        
+        alert('Префикс удален.');
+        displayPrefixesForUser(uid);
+
+    } catch (error) {
+        console.error('Ошибка при удалении префикса:', error);
+        alert('Не удалось удалить префикс.');
+    }
+}
+
 
 // НОВЫЕ ФУНКЦИИ ДЛЯ ВКЛАДКИ СООБЩЕНИЙ В АДМИН-ПАНЕЛИ
 async function renderAdminMessagesTab() {
