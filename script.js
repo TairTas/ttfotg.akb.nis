@@ -14,6 +14,7 @@ const auth = firebase.auth();
 const db = firebase.database();
 
 let currentUser = null, userProfile = {}, currentQuarter = 1, currentSubject = "Английский язык", currentTabId = "section", allGradesData = {}, saveDataTimeout;
+let currentLeaderboardQuarter = '1';
 let currentLeaderboardSort = 'percentage';
 let selectedPostFile = null;
 let postsRef = null;
@@ -107,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const views = { profile: document.getElementById('profile-view'), grades: document.getElementById('grades-view'), stats: document.getElementById('stats-view'), users: document.getElementById('users-view'), leaderboard: document.getElementById('leaderboard-view'), chat: document.getElementById('chat-view'), admin: document.getElementById('admin-panel-view') };
     const navButtons = { profile: document.getElementById('nav-profile'), grades: document.getElementById('nav-grades'), stats: document.getElementById('nav-stats'), users: document.getElementById('nav-users'), leaderboard: document.getElementById('nav-leaderboard'), chat: document.getElementById('nav-chat'), admin: document.getElementById('nav-admin') };
-    Object.keys(navButtons).forEach(key => navButtons[key].addEventListener('click', () => navigateTo(key)));
+    Object.keys(navButtons).forEach(key => navButtons[key].addEventListener('click', (e) => { navigateTo(key); moveNavIndicatorTo(e.currentTarget); }));
 
     document.getElementById('privacy-checkbox').addEventListener('change', (e) => savePrivacySetting(e.target.checked));
     document.getElementById('profile-settings-btn').addEventListener('click', () => { document.getElementById('profile-settings-panel').classList.toggle('hidden'); });
@@ -285,7 +286,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const postImage = e.target.closest('.post-image');
         if (postImage) {
-            window.open(postImage.src, '_blank');
+            // Open image with smooth zoom-from-source animation
+            openImageModalFromElement(postImage);
             return;
         }
         const replyToggleButton = e.target.closest('.reply-toggle-btn');
@@ -331,6 +333,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+    // Initialize image modal handlers now that DOM is ready
+    setupImageModalHandlers();
+    // Initialize nav indicator
+    setupNavIndicator();
+    // Reposition indicator on window resize
+    window.addEventListener('resize', () => { const active = document.querySelector('.main-nav-btn.active'); if (active) positionIndicatorToElement(active, true); });
 });
 
 // --- КОД ФУНКЦИЙ ---
@@ -986,10 +994,40 @@ async function renderLeaderboard() {
         const quarterText = selectedQuarter ? ` (${selectedQuarter} четверть)` : '';
         let tableHTML = `<div class="table-wrapper"><table class="leaderboard-table"><thead><tr><th class="rank-col">#</th><th>Пользователь</th><th class="number-col">Средний %</th><th class="number-col">Средняя оценка</th></tr></thead><tbody>`;
         leaderboardData.forEach((player, index) => {
-            tableHTML += `<tr><td class="rank-col">${index + 1}</td><td>${player.username} ${generatePrefixesHtml(player.prefixes)}</td><td class="number-col">${player.averagePercentage.toFixed(2)} %</td><td class="number-col">${player.averageGrade.toFixed(2)}</td></tr>`;
+            const nameHtml = `<span class="clickable-username" data-username="${player.username}">${player.username}</span> ${generatePrefixesHtml(player.prefixes)}`;
+            tableHTML += `<tr><td class="rank-col">${index + 1}</td><td>${nameHtml}</td><td class="number-col">${player.averagePercentage.toFixed(2)} %</td><td class="number-col">${player.averageGrade.toFixed(2)}</td></tr>`;
         });
         tableHTML += `</tbody></table></div>`;
         container.innerHTML = tableHTML;
+
+        // Make usernames in leaderboard clickable: navigate to user's profile on click
+        container.querySelectorAll('.clickable-username').forEach(el => {
+            el.addEventListener('click', (ev) => {
+                const username = ev.currentTarget.dataset.username;
+                if (username) handleUsernameClick(username);
+            });
+        });
+        // Reveal: use stagger for longer lists, but simple fade-in for very short results
+        const rows = container.querySelectorAll('.leaderboard-table tbody tr');
+        if (rows.length > 3) {
+            requestAnimationFrame(() => {
+                rows.forEach((row, idx) => {
+                    row.classList.add('reveal-item');
+                    setTimeout(() => row.classList.add('visible'), idx * 80);
+                });
+            });
+        } else {
+            // Avoid showing a few placeholder/partial rows with stagger — fade the whole table in
+            container.style.opacity = '0';
+            container.style.transition = 'opacity 420ms cubic-bezier(0.42,0,0.58,1)';
+            requestAnimationFrame(() => { container.style.opacity = '1'; });
+            const cleanup = () => {
+                container.style.opacity = '';
+                container.style.transition = '';
+                container.removeEventListener('transitionend', cleanup);
+            };
+            container.addEventListener('transitionend', cleanup);
+        }
 
     } catch (error) {
         console.error("Ошибка при загрузке лидерборда:", error);
@@ -1231,6 +1269,14 @@ function renderChatView() {
             `;
         });
         postsContainer.innerHTML = postsHtml;
+        // Staggered reveal for posts
+        requestAnimationFrame(() => {
+            const cards = postsContainer.querySelectorAll('.post-card');
+            cards.forEach((card, idx) => {
+                card.classList.add('reveal-item');
+                setTimeout(() => card.classList.add('visible'), idx * 60);
+            });
+        });
     };
     postsRef.on('value', postsListener, (error) => {
         console.error("Ошибка при загрузке постов:", error);
@@ -2152,6 +2198,8 @@ function openCompareModal(uid, username) {
     document.getElementById('compare-modal-overlay').classList.remove('hidden');
     document.getElementById('compare-search-input').value = '';
     document.getElementById('compare-search-results').innerHTML = '';
+    // Populate classes list so user can pick by class as well
+    populateCompareClasses().catch(err => console.error('Ошибка при загрузке классов для сравнения:', err));
 }
 
 async function searchUserForCompare(username) {
@@ -2394,6 +2442,236 @@ function renderCompareView(user1Data, user2Data, quarter) {
     });
 }
 
+// --- NAV INDICATOR HELPERS ---
+let navIndicatorPrevX = 0;
+function setupNavIndicator() {
+    const nav = document.querySelector('.main-nav');
+    if (!nav) return;
+    const indicator = document.getElementById('nav-indicator');
+    if (!indicator) return;
+    // initial positioning under active
+    const active = document.querySelector('.main-nav-btn.active');
+    if (active) positionIndicatorToElement(active, true);
+    // click on nav buttons (delegation) handled elsewhere
+}
+
+function moveNavIndicatorTo(buttonEl) {
+    positionIndicatorToElement(buttonEl, false);
+}
+
+function positionIndicatorToElement(el, instant = false) {
+    const nav = document.querySelector('.main-nav');
+    const indicator = document.getElementById('nav-indicator');
+    if (!nav || !indicator || !el) return;
+    // Prefer aligning under the visible text: measure text bounds if possible
+    const navRect = nav.getBoundingClientRect();
+    let targetX = el.offsetLeft;
+    let targetW = el.offsetWidth;
+    try {
+        const range = document.createRange();
+        // select only the textual content of the button
+        range.selectNodeContents(el);
+        const textRect = range.getBoundingClientRect();
+        // If textRect is meaningful (some browsers may return 0), use it
+        if (textRect && textRect.width > 4) {
+            targetX = (textRect.left - navRect.left) + nav.scrollLeft;
+            targetW = textRect.width;
+        } else {
+            // fallback: use offsetLeft/offsetWidth but compensate for nav scroll
+            targetX = el.offsetLeft - nav.scrollLeft + nav.scrollLeft;
+            targetW = el.offsetWidth;
+        }
+    } catch (e) {
+        // fallback to offsets
+        targetX = el.offsetLeft;
+        targetW = el.offsetWidth;
+    }
+
+    // compute distance for duration
+    const distance = Math.abs(targetX - navIndicatorPrevX);
+    const duration = instant ? 0 : Math.min(700, Math.max(120, Math.round(distance * 0.6) + 120));
+
+    indicator.style.transitionDuration = `${duration}ms`;
+    // apply a modest inset (8% clamped) but ensure the indicator isn't too short
+    const inset = Math.round(Math.min(12, Math.max(4, targetW * 0.08)));
+    let finalWidth = targetW - inset * 2;
+    // If the computed final width is very small, prefer a minimum visible width (but not wider than the target)
+    const minVisible = Math.min(40, targetW);
+    if (finalWidth < minVisible) {
+        finalWidth = minVisible;
+    }
+    // center the indicator under the text/button
+    const finalX = targetX + Math.max(0, Math.floor((targetW - finalWidth) / 2));
+    indicator.style.width = `${finalWidth}px`;
+    indicator.style.transform = `translateX(${finalX}px)`;
+
+    navIndicatorPrevX = finalX;
+}
+
+// --- IMAGE ZOOM-MODAL HELPERS ---
+let currentImageSourceEl = null;
+async function openImageModalFromElement(imgEl) {
+    if (!imgEl) return;
+    currentImageSourceEl = imgEl;
+    const src = imgEl.src;
+    const body = document.body;
+
+    // calculate source rect
+    const srcRect = imgEl.getBoundingClientRect();
+
+    // create clone
+    const clone = imgEl.cloneNode(true);
+    clone.style.position = 'fixed';
+    clone.style.left = `${srcRect.left}px`;
+    clone.style.top = `${srcRect.top}px`;
+    clone.style.width = `${srcRect.width}px`;
+    clone.style.height = `${srcRect.height}px`;
+    clone.style.margin = '0';
+    clone.style.transition = 'all 480ms cubic-bezier(0.42,0,0.58,1)';
+    clone.style.zIndex = 4500;
+    clone.style.borderRadius = window.getComputedStyle(imgEl).borderRadius || '8px';
+    body.appendChild(clone);
+
+    // show overlay but keep modal img hidden until animation ends
+    const overlay = document.getElementById('image-modal-overlay');
+    const modalImg = document.getElementById('image-modal-img');
+    if (!overlay || !modalImg) return;
+    // lock body scroll so the source doesn't move while modal is open
+    try { document.body.style.overflow = 'hidden'; } catch (e) {}
+    overlay.classList.remove('hidden');
+    overlay.style.opacity = '0';
+    // trigger fade in of overlay
+    requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+
+    // compute target rect (centered, fit to viewport with padding)
+    const maxW = window.innerWidth * 0.9;
+    const maxH = window.innerHeight * 0.9;
+    // create a temp image to get natural size
+    const temp = new Image();
+    temp.src = src;
+    temp.onload = () => {
+        const naturalW = temp.naturalWidth;
+        const naturalH = temp.naturalHeight;
+        let targetW = naturalW;
+        let targetH = naturalH;
+        const ratio = Math.min(maxW / naturalW, maxH / naturalH, 1);
+        targetW = naturalW * ratio;
+        targetH = naturalH * ratio;
+
+        const targetLeft = (window.innerWidth - targetW) / 2;
+        const targetTop = (window.innerHeight - targetH) / 2;
+
+        // animate clone to target
+        requestAnimationFrame(() => {
+            clone.style.left = `${targetLeft}px`;
+            clone.style.top = `${targetTop}px`;
+            clone.style.width = `${targetW}px`;
+            clone.style.height = `${targetH}px`;
+            clone.style.boxShadow = '0 30px 60px rgba(0,0,0,0.5)';
+        });
+
+        // when animation ends, show modalImg and remove clone
+        const onCloneTransitionEnd = () => {
+            clone.removeEventListener('transitionend', onCloneTransitionEnd);
+            modalImg.src = src;
+            modalImg.style.visibility = 'visible';
+            if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
+        };
+        clone.addEventListener('transitionend', onCloneTransitionEnd);
+    };
+}
+
+function closeImageModalToSource() {
+    const overlay = document.getElementById('image-modal-overlay');
+    const modalImg = document.getElementById('image-modal-img');
+    if (!overlay || !modalImg) return;
+
+    // if we have a source element and it is in DOM, animate back
+    const srcEl = currentImageSourceEl;
+    let srcRect = null;
+    if (srcEl && document.body.contains(srcEl)) {
+        srcRect = srcEl.getBoundingClientRect();
+    }
+
+    // create clone from modal image
+    const clone = modalImg.cloneNode(true);
+    const modalRect = modalImg.getBoundingClientRect();
+    clone.style.position = 'fixed';
+    clone.style.left = `${modalRect.left}px`;
+    clone.style.top = `${modalRect.top}px`;
+    clone.style.width = `${modalRect.width}px`;
+    clone.style.height = `${modalRect.height}px`;
+    clone.style.margin = '0';
+    clone.style.transition = 'all 480ms cubic-bezier(0.42,0,0.58,1)';
+    clone.style.zIndex = 4500;
+    clone.style.borderRadius = window.getComputedStyle(modalImg).borderRadius || '8px';
+    document.body.appendChild(clone);
+
+    // hide real modal image immediately
+    modalImg.style.visibility = 'hidden';
+
+    // fade overlay
+    overlay.style.opacity = '0';
+
+    // compute target
+    if (srcRect) {
+        requestAnimationFrame(() => {
+            clone.style.left = `${srcRect.left}px`;
+            clone.style.top = `${srcRect.top}px`;
+            clone.style.width = `${srcRect.width}px`;
+            clone.style.height = `${srcRect.height}px`;
+            clone.style.boxShadow = '0 6px 18px rgba(0,0,0,0.15)';
+        });
+    } else {
+        // just scale down to center if no source
+        requestAnimationFrame(() => {
+            clone.style.transform = 'scale(0.6)';
+            clone.style.opacity = '0';
+        });
+    }
+
+    const cleanup = () => {
+        if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
+        overlay.classList.add('hidden');
+        modalImg.src = '#';
+        modalImg.style.visibility = 'hidden';
+        currentImageSourceEl = null;
+        // restore body scroll
+        try { document.body.style.overflow = ''; } catch (e) {}
+    };
+
+    clone.addEventListener('transitionend', cleanup);
+}
+
+// ensure close handlers call animated close
+function setupImageModalHandlers() {
+    const overlay = document.getElementById('image-modal-overlay');
+    const closeBtn = document.getElementById('image-modal-close');
+    const modalImg = document.getElementById('image-modal-img');
+    if (!overlay) return;
+
+    // Close when clicking close button
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            closeImageModalToSource();
+        });
+    }
+
+    // Close when clicking outside the image (on overlay)
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            closeImageModalToSource();
+        }
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !overlay.classList.contains('hidden')) {
+            closeImageModalToSource();
+        }
+    });
+}
+
 function calculateCompareStats(quarterData) {
     let subjectPerformances = [];
     if (quarterData && quarterData.section) {
@@ -2427,4 +2705,121 @@ function calculateCompareStats(quarterData) {
 function closeCompareView() {
     document.getElementById('compare-view').classList.add('hidden');
     navigateTo('users');
+}
+
+
+
+// --- Compare modal: class-based search helpers ---
+async function populateCompareClasses() {
+    const classesContainerId = 'compare-classes-container';
+    let classesContainer = document.getElementById(classesContainerId);
+    const resultsContainer = document.getElementById('compare-search-results');
+    if (!classesContainer) {
+        classesContainer = document.createElement('div');
+        classesContainer.id = classesContainerId;
+        classesContainer.className = 'classes-container';
+        // place it below the search results area
+        const parent = document.getElementById('compare-user-select-container');
+        if (parent) parent.appendChild(classesContainer);
+    }
+
+    // If we already have users grouped by class, reuse them
+    if (!allUsersByClass || Object.keys(allUsersByClass).length === 0) {
+        // Load public users (and own profile if available)
+        try {
+            const usersRef = db.ref('users');
+            const publicUsersSnapshot = await usersRef.orderByChild('profile/isPublic').equalTo(true).once('value');
+
+            allUsersByClass = {};
+            const addedUids = new Set();
+            if (publicUsersSnapshot.exists()) {
+                publicUsersSnapshot.forEach(childSnapshot => {
+                    const user = childSnapshot.val();
+                    const uid = childSnapshot.key;
+                    if (!user.profile || !user.profile.class) return;
+                    const userClass = user.profile.class.toLowerCase().trim();
+                    if (!allUsersByClass[userClass]) allUsersByClass[userClass] = [];
+                    if (!addedUids.has(uid)) {
+                        allUsersByClass[userClass].push({ uid, ...user });
+                        addedUids.add(uid);
+                    }
+                });
+            }
+
+            // Add own profile even if private
+            if (currentUser) {
+                try {
+                    const ownSnap = await db.ref(`users/${currentUser.uid}`).once('value');
+                    if (ownSnap.exists()) {
+                        const own = { uid: currentUser.uid, ...ownSnap.val() };
+                        if (own.profile && own.profile.class) {
+                            const uc = own.profile.class.toLowerCase().trim();
+                            if (!allUsersByClass[uc]) allUsersByClass[uc] = [];
+                            if (!addedUids.has(own.uid)) {
+                                allUsersByClass[uc].push(own);
+                                addedUids.add(own.uid);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            }
+
+            // Sort users in each class by username
+            Object.keys(allUsersByClass).forEach(cls => {
+                allUsersByClass[cls].sort((a, b) => (a.profile.username || '').localeCompare(b.profile.username || ''));
+            });
+        } catch (error) {
+            console.error('Ошибка при загрузке пользователей для сравнения:', error);
+            classesContainer.innerHTML = '<p class="no-data-message">Не удалось загрузить классы.</p>';
+            return;
+        }
+    }
+
+    // Render class cards
+    const classOrder = ['7a', '7b', '7c', '7d', '7e', '7f', '7g', '7h', '7i', '7j'];
+    let classesHtml = '';
+    classOrder.forEach(className => {
+        const count = allUsersByClass[className] ? allUsersByClass[className].length : 0;
+        classesHtml += `<div class="class-card" data-class="${className}"><div class="class-name">${className.toUpperCase()}</div><div class="class-count">${count} ${count === 1 ? 'человек' : count < 5 ? 'человека' : 'человек'}</div></div>`;
+    });
+    classesContainer.innerHTML = classesHtml;
+
+    classesContainer.querySelectorAll('.class-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const selectedClass = card.dataset.class;
+            // show users of this class in compare-search-results
+            renderCompareUsersForClass(selectedClass);
+            classesContainer.querySelectorAll('.class-card').forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+        });
+    });
+}
+
+function renderCompareUsersForClass(className) {
+    const resultsContainer = document.getElementById('compare-search-results');
+    const users = allUsersByClass[className] || [];
+    if (users.length === 0) {
+        resultsContainer.innerHTML = '<p class="no-data-message">В этом классе нет пользователей.</p>';
+        return;
+    }
+
+    let html = '<div style="margin-top: 10px; display: grid; gap: 10px;">';
+    users.forEach(user => {
+        const photoURL = user.profile.photoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png';
+        const prefixesHtml = generatePrefixesHtml(user.profile.prefixes || []);
+        html += `
+            <div style="display:flex; align-items:center; gap:12px; padding:10px; border:1px solid var(--border-color); border-radius:8px; background:var(--card-background);">
+                <img src="${photoURL}" style="width:48px; height:48px; border-radius:50%; object-fit:cover;">
+                <div style="flex:1;">
+                    <div style="font-weight:600;">${user.profile.username} ${prefixesHtml}</div>
+                    <div style="color:var(--text-muted);">${user.profile.class || ''}</div>
+                </div>
+                <button class="button" onclick="selectCompareUser('${user.uid}')">Выбрать</button>
+            </div>
+        `;
+    });
+    html += '</div>';
+    resultsContainer.innerHTML = html;
 }
