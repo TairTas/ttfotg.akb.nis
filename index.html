@@ -53,6 +53,7 @@
             <button id="nav-leaderboard" class="main-nav-btn">Лидерборд</button>
             <button id="nav-chat" class="main-nav-btn">Форум</button>
             <button id="nav-admin" class="main-nav-btn hidden">Админ Панель</button>
+            <div id="nav-indicator" aria-hidden="true"></div>
         </nav>
         
         <main id="app-main">
@@ -143,11 +144,11 @@
                 <div class="content-card">
                     <h3>Лидерборд</h3>
                     <div class="quarter-selector" id="leaderboard-quarter-selector">
-                        <button class="q-btn active" data-quarter="all">Все четверти</button>
-                        <button class="q-btn" data-quarter="1">1</button>
+                        <button class="q-btn active" data-quarter="1">1</button>
                         <button class="q-btn" data-quarter="2">2</button>
                         <button class="q-btn" data-quarter="3">3</button>
                         <button class="q-btn" data-quarter="4">4</button>
+                        <button class="q-btn" data-quarter="all">Все четверти</button>
                     </div>
                     <div class="leaderboard-controls">
                         <div id="leaderboard-sort-controls">
@@ -218,6 +219,13 @@
             <button id="announcement-close-btn">&times;</button>
             <h3>Сообщение от администрации</h3>
             <p id="announcement-text"></p>
+        </div>
+    </div>
+    <!-- Image modal for expanded post images -->
+    <div id="image-modal-overlay" class="hidden">
+        <div id="image-modal">
+            <button id="image-modal-close" aria-label="Закрыть изображение">&times;</button>
+            <img id="image-modal-img" src="#" alt="Просмотр изображения">
         </div>
     </div>
     
