@@ -116,7 +116,14 @@
             <div id="grades-view" class="hidden">
                 <div class="content-card wide">
                      <div class="sidebar"><table><thead><tr><th></th><th>Предмет</th><th>Общий %</th><th>Оценка</th></tr></thead><tbody id="my-grades-sidebar-body"></tbody></table></div>
-                    <div class="main-content"><div class="quarter-selector"><button class="q-btn active" data-quarter="1">1</button><button class="q-btn" data-quarter="2">2</button><button class="q-btn" data-quarter="3">3</button><button class="q-btn" data-quarter="4">4</button></div><div class="tabs"><div class="tab active" data-tab-id="section">СОР</div><div class="tab" data-tab-id="quarter">СОЧ</div></div><div id="content-display"></div></div>
+                    <div class="main-content">
+                        <div class="quarter-selector"><button class="q-btn active" data-quarter="1">1</button><button class="q-btn" data-quarter="2">2</button><button class="q-btn" data-quarter="3">3</button><button class="q-btn" data-quarter="4">4</button></div>
+                        <div class="tabs"><div class="tab active" data-tab-id="section">СОР</div><div class="tab" data-tab-id="quarter">СОЧ</div></div>
+                        <div id="content-display"></div>
+                        <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px; text-align: right;">
+                            <button id="delete-all-grades-btn" class="button secondary">Удалить все оценки</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 

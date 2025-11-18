@@ -339,6 +339,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupNavIndicator();
     // Reposition indicator on window resize
     window.addEventListener('resize', () => { const active = document.querySelector('.main-nav-btn.active'); if (active) positionIndicatorToElement(active, true); });
+
+    document.getElementById('delete-all-grades-btn').addEventListener('click', handleDeleteAllGrades);
 });
 
 // --- КОД ФУНКЦИЙ ---
@@ -2822,4 +2824,21 @@ function renderCompareUsersForClass(className) {
     });
     html += '</div>';
     resultsContainer.innerHTML = html;
+}
+
+function handleDeleteAllGrades() {
+    if (!currentUser) return;
+
+    if (confirm('Вы уверены, что хотите удалить все свои оценки? Это действие необратимо.')) {
+        db.ref(`users/${currentUser.uid}/grades`).remove()
+            .then(() => {
+                allGradesData = {};
+                renderApp();
+                alert('Все оценки были успешно удалены.');
+            })
+            .catch(error => {
+                console.error('Ошибка при удалении оценок:', error);
+                alert('Произошла ошибка при удалении оценок.');
+            });
+    }
 }
