@@ -15,7 +15,7 @@ const db = firebase.database();
 
 let currentUser = null, userProfile = {}, currentQuarter = 1, currentSubject = "Английский язык", currentTabId = "section", allGradesData = {}, saveDataTimeout;
 let currentLeaderboardQuarter = '1';
-let currentLeaderboardSort = 'percentage';
+let currentLeaderboardSort = 'egr';
 let selectedPostFile = null;
 let postsRef = null;
 let postsListener = null;
@@ -339,8 +339,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupNavIndicator();
     // Reposition indicator on window resize
     window.addEventListener('resize', () => { const active = document.querySelector('.main-nav-btn.active'); if (active) positionIndicatorToElement(active, true); });
-
-    document.getElementById('delete-all-grades-btn').addEventListener('click', handleDeleteAllGrades);
 });
 
 // --- КОД ФУНКЦИЙ ---
@@ -512,6 +510,13 @@ function renderProfileDashboard() {
         });
     } else {
         summaryBody.innerHTML = '<tr><td colspan="4">Нет данных для этой четверти.</td></tr>';
+    }
+
+    // Display EGR points for current user for the selected quarter
+    const egrDisplay = document.getElementById('profile-egr-display');
+    if (egrDisplay) {
+        const egrPoints = calculateEGR(allGradesData, currentQuarter);
+        egrDisplay.textContent = `EGR очки: ${egrPoints}`;
     }
 }
 function searchAndDisplayUser(username, byLink = false) {
@@ -966,17 +971,21 @@ async function renderLeaderboard() {
                 return;
             }
 
-            if (user.grades) {
-                const stats = calculateOverallStats(user.grades, selectedQuarter);
-                if (stats.averagePercentage > 0) { 
-                    leaderboardData.push({
-                        username: user.profile.username,
-                        prefixes: user.profile.prefixes || [],
-                        averagePercentage: stats.averagePercentage,
-                        averageGrade: stats.averageGrade
-                    });
-                }
+            // Compute overall stats and EGR for this user
+            const gradesForUser = user.grades || {};
+            const stats = calculateOverallStats(gradesForUser, selectedQuarter);
+            const egrPoints = calculateEGR(gradesForUser, selectedQuarter);
+            // Only include users with at least some percentage data
+            if (stats.averagePercentage > 0 || egrPoints > 0) {
+                leaderboardData.push({
+                    username: user.profile.username,
+                    prefixes: user.profile.prefixes || [],
+                    averagePercentage: stats.averagePercentage,
+                    averageGrade: stats.averageGrade,
+                    egrPoints: egrPoints
+                });
             }
+            
         });
 
         if (leaderboardData.length === 0) {
@@ -985,19 +994,23 @@ async function renderLeaderboard() {
             return;
         }
 
+        // Sort by selected metric
         leaderboardData.sort((a, b) => {
             if (currentLeaderboardSort === 'percentage') {
                 return b.averagePercentage - a.averagePercentage;
-            } else {
+            } else if (currentLeaderboardSort === 'grade') {
                 return b.averageGrade - a.averageGrade;
+            } else if (currentLeaderboardSort === 'egr') {
+                return (b.egrPoints || 0) - (a.egrPoints || 0);
             }
+            return 0;
         });
 
         const quarterText = selectedQuarter ? ` (${selectedQuarter} четверть)` : '';
-        let tableHTML = `<div class="table-wrapper"><table class="leaderboard-table"><thead><tr><th class="rank-col">#</th><th>Пользователь</th><th class="number-col">Средний %</th><th class="number-col">Средняя оценка</th></tr></thead><tbody>`;
+        let tableHTML = `<div class="table-wrapper"><table class="leaderboard-table"><thead><tr><th class="rank-col">#</th><th>Пользователь</th><th class="number-col">EGR очки</th><th class="number-col">Средний %</th><th class="number-col">Средняя оценка</th></tr></thead><tbody>`;
         leaderboardData.forEach((player, index) => {
             const nameHtml = `<span class="clickable-username" data-username="${player.username}">${player.username}</span> ${generatePrefixesHtml(player.prefixes)}`;
-            tableHTML += `<tr><td class="rank-col">${index + 1}</td><td>${nameHtml}</td><td class="number-col">${player.averagePercentage.toFixed(2)} %</td><td class="number-col">${player.averageGrade.toFixed(2)}</td></tr>`;
+            tableHTML += `<tr><td class="rank-col">${index + 1}</td><td>${nameHtml}</td><td class="number-col">${(player.egrPoints || 0)}</td><td class="number-col">${player.averagePercentage.toFixed(2)} %</td><td class="number-col">${player.averageGrade.toFixed(2)}</td></tr>`;
         });
         tableHTML += `</tbody></table></div>`;
         container.innerHTML = tableHTML;
@@ -1085,6 +1098,68 @@ function calculateOverallStats(gradesData, selectedQuarter = null) {
     const avgPercentage = allPercentages.reduce((a, b) => a + b, 0) / allPercentages.length;
     const avgGrade = allGrades.reduce((a, b) => a + b, 0) / allGrades.length;
     return { averagePercentage: avgPercentage, averageGrade: avgGrade };
+}
+
+// Check whether a specific subject in a quarter has all SOR and SOCH results filled
+function isSubjectCompleteInQuarter(quarterData, subjectName) {
+    if (!quarterData) return false;
+    let hasAny = false;
+    // section (SOR)
+    const sectionArr = quarterData.section && quarterData.section[subjectName] ? quarterData.section[subjectName] : [];
+    if (Array.isArray(sectionArr) && sectionArr.length > 0) {
+        hasAny = true;
+        for (const task of sectionArr) {
+            if (task.userResult === '' || task.userResult === null || task.userResult === undefined) return false;
+        }
+    }
+    // quarter (SOCH)
+    const quarterArr = quarterData.quarter && quarterData.quarter[subjectName] ? quarterData.quarter[subjectName] : [];
+    if (Array.isArray(quarterArr) && quarterArr.length > 0) {
+        hasAny = true;
+        for (const task of quarterArr) {
+            if (task.userResult === '' || task.userResult === null || task.userResult === undefined) return false;
+        }
+    }
+    // If subject had no tasks at all, treat as incomplete
+    return hasAny;
+}
+
+// Calculate EGR points: sum of integer percentages for eligible subjects * 10
+function calculateEGR(gradesData, selectedQuarter = null) {
+    if (!gradesData || Object.keys(gradesData).length === 0) return 0;
+    let total = 0;
+    if (selectedQuarter !== null) {
+        const qKey = `q${selectedQuarter}`;
+        const quarterData = gradesData[qKey];
+        if (!quarterData) return 0;
+        const subjects = Object.keys(quarterData.section || {}).concat(Object.keys(quarterData.quarter || {}));
+        const uniqueSubjects = [...new Set(subjects)];
+        uniqueSubjects.forEach(subject => {
+            if (isSubjectCompleteInQuarter(quarterData, subject)) {
+                const perc = calculateFinalPercentageForFriend(subject, quarterData);
+                if (perc !== null && !isNaN(perc)) {
+                    total += Math.round(perc);
+                }
+            }
+        });
+    } else {
+        // All quarters: include subjects from all quarters where they are complete per quarter
+        ['q1','q2','q3','q4'].forEach(qKey => {
+            const quarterData = gradesData[qKey];
+            if (!quarterData) return;
+            const subjects = Object.keys(quarterData.section || {}).concat(Object.keys(quarterData.quarter || {}));
+            const uniqueSubjects = [...new Set(subjects)];
+            uniqueSubjects.forEach(subject => {
+                if (isSubjectCompleteInQuarter(quarterData, subject)) {
+                    const perc = calculateFinalPercentageForFriend(subject, quarterData);
+                    if (perc !== null && !isNaN(perc)) {
+                        total += Math.round(perc);
+                    }
+                }
+            });
+        });
+    }
+    return total * 10;
 }
 async function handlePostSubmit() {
     const postTextInput = document.getElementById('post-text-input');
@@ -2824,21 +2899,4 @@ function renderCompareUsersForClass(className) {
     });
     html += '</div>';
     resultsContainer.innerHTML = html;
-}
-
-function handleDeleteAllGrades() {
-    if (!currentUser) return;
-
-    if (confirm('Вы уверены, что хотите удалить все свои оценки? Это действие необратимо.')) {
-        db.ref(`users/${currentUser.uid}/grades`).remove()
-            .then(() => {
-                allGradesData = {};
-                renderApp();
-                alert('Все оценки были успешно удалены.');
-            })
-            .catch(error => {
-                console.error('Ошибка при удалении оценок:', error);
-                alert('Произошла ошибка при удалении оценок.');
-            });
-    }
 }
