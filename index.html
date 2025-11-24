@@ -71,6 +71,7 @@
                         <div id="profile-info-display">
                             <h2 id="profile-username"></h2>
                             <p id="profile-class"></p>
+                            <div id="profile-egr-display" style="margin-top:6px; font-weight:600; color:var(--primary-color);">EGR очки: --</div>
                         </div>
                         <div id="profile-info-edit" class="hidden">
                              <input type="text" id="edit-username-input" placeholder="Имя пользователя">
@@ -116,14 +117,7 @@
             <div id="grades-view" class="hidden">
                 <div class="content-card wide">
                      <div class="sidebar"><table><thead><tr><th></th><th>Предмет</th><th>Общий %</th><th>Оценка</th></tr></thead><tbody id="my-grades-sidebar-body"></tbody></table></div>
-                    <div class="main-content">
-                        <div class="quarter-selector"><button class="q-btn active" data-quarter="1">1</button><button class="q-btn" data-quarter="2">2</button><button class="q-btn" data-quarter="3">3</button><button class="q-btn" data-quarter="4">4</button></div>
-                        <div class="tabs"><div class="tab active" data-tab-id="section">СОР</div><div class="tab" data-tab-id="quarter">СОЧ</div></div>
-                        <div id="content-display"></div>
-                        <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px; text-align: right;">
-                            <button id="delete-all-grades-btn" class="button secondary">Удалить все оценки</button>
-                        </div>
-                    </div>
+                    <div class="main-content"><div class="quarter-selector"><button class="q-btn active" data-quarter="1">1</button><button class="q-btn" data-quarter="2">2</button><button class="q-btn" data-quarter="3">3</button><button class="q-btn" data-quarter="4">4</button></div><div class="tabs"><div class="tab active" data-tab-id="section">СОР</div><div class="tab" data-tab-id="quarter">СОЧ</div></div><div id="content-display"></div></div>
                 </div>
             </div>
 
@@ -160,8 +154,9 @@
                     <div class="leaderboard-controls">
                         <div id="leaderboard-sort-controls">
                             <span>Сортировать по: </span>
-                            <button data-sort="percentage" class="button active">Среднему %</button>
-                            <button data-sort="grade" class="button secondary">Средней оценке</button>
+                                <button data-sort="egr" class="button active">EGR очки</button>
+                                <button data-sort="percentage" class="button secondary">Среднему %</button>
+                                <button data-sort="grade" class="button secondary">Средней оценке</button>
                         </div>
                         <div id="leaderboard-filter-controls">
                             <label><input type="checkbox" id="leaderboard-filter-complete"> Показать только заполнивших все оценки</label>
