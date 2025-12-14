@@ -1,15 +1,17 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Облачный Калькулятор Оценок</title>
     <link rel="stylesheet" href="style.css">
-    
+
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 </head>
+
 <body>
 
     <div id="auth-overlay">
@@ -55,13 +57,15 @@
             <button id="nav-admin" class="main-nav-btn hidden">Админ Панель</button>
             <div id="nav-indicator" aria-hidden="true"></div>
         </nav>
-        
+
         <main id="app-main">
             <div id="profile-view">
                 <div class="content-card">
                     <div class="profile-header">
                         <div id="profile-picture-container" title="Нажмите, чтобы изменить фото">
-                            <img id="profile-picture-img" src="https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png" alt="Фото профиля">
+                            <img id="profile-picture-img"
+                                src="https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png"
+                                alt="Фото профиля">
                             <div id="profile-picture-edit-overlay">
                                 <span>+</span>
                             </div>
@@ -71,26 +75,41 @@
                         <div id="profile-info-display">
                             <h2 id="profile-username"></h2>
                             <p id="profile-class"></p>
-                            <div id="profile-egr-display" style="margin-top:6px; font-weight:600; color:var(--primary-color);">EGR очки: --</div>
+                            <div id="profile-egr-display"
+                                style="margin-top:6px; font-weight:600; color:var(--primary-color);">EGR очки: --</div>
                         </div>
                         <div id="profile-info-edit" class="hidden">
-                             <input type="text" id="edit-username-input" placeholder="Имя пользователя">
-                             <input type="text" id="edit-class-input" placeholder="Класс">
-                             <p id="edit-profile-error" class="auth-error-msg"></p>
+                            <input type="text" id="edit-username-input" placeholder="Имя пользователя">
+                            <input type="text" id="edit-class-input" placeholder="Класс">
+                            <p id="edit-profile-error" class="auth-error-msg"></p>
                         </div>
                         <div class="profile-actions">
-                             <div id="profile-view-actions">
-                                 <button id="profile-share-btn" class="icon-btn" title="Поделиться профилем"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M18,16.08c-0.76,0-1.44,0.3-1.96,0.77L8.91,12.7c0.05-0.23,0.09-0.46,0.09-0.7s-0.04-0.47-0.09-0.7l7.05-4.11 c0.54,0.5,1.25,0.81,2.04,0.81c1.66,0,3-1.34,3-3s-1.34-3-3-3s-3,1.34-3,3c0,0.24,0.04,0.47,0.09,0.7L8.04,9.81 C7.5,9.31,6.79,9,6,9c-1.66,0-3,1.34-3,3s1.34,3,3,3c0.79,0,1.5-0.31,2.04-0.81l7.12,4.16c-0.05,0.21-0.08,0.43-0.08,0.65 c0,1.66,1.34,3,3,3s3-1.34,3-3S19.66,16.08,18,16.08z"/></svg></button>
-                                 <button id="profile-edit-btn" class="icon-btn" title="Редактировать профиль"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M3,17.25V21h3.75L17.81,9.94l-3.75-3.75L3,17.25z M20.71,7.04c0.39-0.39,0.39-1.02,0-1.41l-2.34-2.34 c-0.39-0.39-1.02-0.39-1.41,0l-1.83,1.83l3.75,3.75L20.71,7.04z"/></svg></button>
-                                 <button id="profile-settings-btn" class="icon-btn" title="Настройки приватности"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.44,0.17-0.48,0.41L9.22,5.72C8.63,5.96,8.1,6.29,7.6,6.67L5.21,5.71C4.99,5.62,4.74,5.69,4.62,5.92L2.7,9.24 c-0.11,0.2-0.06,0.47,0.12,0.61L4.85,11c-0.04,0.3-0.06,0.61-0.06,0.94c0,0.32,0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.38,2.91 c0.04,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44,0.17-0.48,0.41l0.38-2.91c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0.01,0.59-0.22l1.92-3.32c0.11-0.2,0.06-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg></button>
-                             </div>
-                             <div id="profile-edit-actions" class="hidden">
-                                 <button id="profile-save-btn" class="button">Сохранить</button>
-                                 <button id="profile-cancel-btn" class="button secondary">Отмена</button>
-                             </div>
+                            <div id="profile-view-actions">
+                                <button id="profile-share-btn" class="icon-btn" title="Поделиться профилем"><svg
+                                        viewBox="0 0 24 24">
+                                        <path fill="currentColor"
+                                            d="M18,16.08c-0.76,0-1.44,0.3-1.96,0.77L8.91,12.7c0.05-0.23,0.09-0.46,0.09-0.7s-0.04-0.47-0.09-0.7l7.05-4.11 c0.54,0.5,1.25,0.81,2.04,0.81c1.66,0,3-1.34,3-3s-1.34-3-3-3s-3,1.34-3,3c0,0.24,0.04,0.47,0.09,0.7L8.04,9.81 C7.5,9.31,6.79,9,6,9c-1.66,0-3,1.34-3,3s1.34,3,3,3c0.79,0,1.5-0.31,2.04-0.81l7.12,4.16c-0.05,0.21-0.08,0.43-0.08,0.65 c0,1.66,1.34,3,3,3s3-1.34,3-3S19.66,16.08,18,16.08z" />
+                                    </svg></button>
+                                <button id="profile-edit-btn" class="icon-btn" title="Редактировать профиль"><svg
+                                        viewBox="0 0 24 24">
+                                        <path fill="currentColor"
+                                            d="M3,17.25V21h3.75L17.81,9.94l-3.75-3.75L3,17.25z M20.71,7.04c0.39-0.39,0.39-1.02,0-1.41l-2.34-2.34 c-0.39-0.39-1.02-0.39-1.41,0l-1.83,1.83l3.75,3.75L20.71,7.04z" />
+                                    </svg></button>
+                                <button id="profile-settings-btn" class="icon-btn" title="Настройки приватности"><svg
+                                        viewBox="0 0 24 24">
+                                        <path fill="currentColor"
+                                            d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.44,0.17-0.48,0.41L9.22,5.72C8.63,5.96,8.1,6.29,7.6,6.67L5.21,5.71C4.99,5.62,4.74,5.69,4.62,5.92L2.7,9.24 c-0.11,0.2-0.06,0.47,0.12,0.61L4.85,11c-0.04,0.3-0.06,0.61-0.06,0.94c0,0.32,0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.38,2.91 c0.04,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44,0.17-0.48,0.41l0.38-2.91c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0.01,0.59-0.22l1.92-3.32c0.11-0.2,0.06-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z" />
+                                    </svg></button>
+                            </div>
+                            <div id="profile-edit-actions" class="hidden">
+                                <button id="profile-save-btn" class="button">Сохранить</button>
+                                <button id="profile-cancel-btn" class="button secondary">Отмена</button>
+                            </div>
                         </div>
                         <div id="profile-settings-panel" class="settings-panel hidden">
-                             <div class="setting-item"><label class="privacy-toggle"><input type="checkbox" id="privacy-checkbox"><span class="slider"></span></label><span>Сделать профиль публичным</span></div>
+                            <div class="setting-item"><label class="privacy-toggle"><input type="checkbox"
+                                        id="privacy-checkbox"><span class="slider"></span></label><span>Сделать профиль
+                                    публичным</span></div>
                         </div>
                     </div>
                 </div>
@@ -105,7 +124,12 @@
                         <div id="profile-grades-summary-container">
                             <table>
                                 <thead>
-                                    <tr><th></th><th>Предмет</th><th>Общий %</th><th>Оценка</th></tr>
+                                    <tr>
+                                        <th></th>
+                                        <th>Предмет</th>
+                                        <th>Общий %</th>
+                                        <th>Оценка</th>
+                                    </tr>
                                 </thead>
                                 <tbody id="profile-grades-summary-body"></tbody>
                             </table>
@@ -113,16 +137,44 @@
                     </div>
                 </div>
             </div>
-            
+
             <div id="grades-view" class="hidden">
                 <div class="content-card wide">
-                     <div class="sidebar"><table><thead><tr><th></th><th>Предмет</th><th>Общий %</th><th>Оценка</th></tr></thead><tbody id="my-grades-sidebar-body"></tbody></table></div>
-                    <div class="main-content"><div class="quarter-selector"><button class="q-btn active" data-quarter="1">1</button><button class="q-btn" data-quarter="2">2</button><button class="q-btn" data-quarter="3">3</button><button class="q-btn" data-quarter="4">4</button></div><div class="tabs"><div class="tab active" data-tab-id="section">СОР</div><div class="tab" data-tab-id="quarter">СОЧ</div></div><div id="content-display"></div></div>
+                    <div class="sidebar">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Предмет</th>
+                                    <th>Общий %</th>
+                                    <th>Оценка</th>
+                                </tr>
+                            </thead>
+                            <tbody id="my-grades-sidebar-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="main-content">
+                        <div class="quarter-selector"><button class="q-btn active" data-quarter="1">1</button><button
+                                class="q-btn" data-quarter="2">2</button><button class="q-btn"
+                                data-quarter="3">3</button><button class="q-btn" data-quarter="4">4</button></div>
+                        <div class="tabs">
+                            <div class="tab active" data-tab-id="section">СОР</div>
+                            <div class="tab" data-tab-id="quarter">СОЧ</div>
+                        </div>
+                        <div id="content-display"></div>
+                    </div>
                 </div>
             </div>
 
             <div id="stats-view" class="hidden">
-                 <div class="content-card"><h3>Статистика за четверть</h3><div class="quarter-selector" id="stats-q-selector"><button class="q-btn active" data-quarter="1">1</button><button class="q-btn" data-quarter="2">2</button><button class="q-btn" data-quarter="3">3</button><button class="q-btn" data-quarter="4">4</button></div><div id="stats-results-container" class="stats-results-container"></div></div>
+                <div class="content-card">
+                    <h3>Статистика за четверть</h3>
+                    <div class="quarter-selector" id="stats-q-selector"><button class="q-btn active"
+                            data-quarter="1">1</button><button class="q-btn" data-quarter="2">2</button><button
+                            class="q-btn" data-quarter="3">3</button><button class="q-btn" data-quarter="4">4</button>
+                    </div>
+                    <div id="stats-results-container" class="stats-results-container"></div>
+                </div>
             </div>
 
             <div id="users-view" class="hidden">
@@ -140,7 +192,7 @@
                     <div id="users-list-container" class="users-list-container hidden"></div>
                 </div>
             </div>
-            
+
             <div id="leaderboard-view" class="hidden">
                 <div class="content-card">
                     <h3>Лидерборд</h3>
@@ -154,12 +206,13 @@
                     <div class="leaderboard-controls">
                         <div id="leaderboard-sort-controls">
                             <span>Сортировать по: </span>
-                                <button data-sort="egr" class="button active">EGR очки</button>
-                                <button data-sort="percentage" class="button secondary">Среднему %</button>
-                                <button data-sort="grade" class="button secondary">Средней оценке</button>
+                            <button data-sort="egr" class="button active">EGR очки</button>
+                            <button data-sort="percentage" class="button secondary">Среднему %</button>
+                            <button data-sort="grade" class="button secondary">Средней оценке</button>
                         </div>
                         <div id="leaderboard-filter-controls">
-                            <label><input type="checkbox" id="leaderboard-filter-complete"> Показать только заполнивших все оценки</label>
+                            <label><input type="checkbox" id="leaderboard-filter-complete"> Показать только заполнивших
+                                все оценки</label>
                         </div>
                     </div>
                     <div id="leaderboard-table-container">
@@ -174,17 +227,19 @@
                     <div class="forum-categories">
                         <button class="forum-category-btn active" data-category="chat">Чат</button>
                         <button class="forum-category-btn" data-category="homework">ДЗ</button>
+                        <button class="forum-category-btn" data-category="sors">Соры</button>
                     </div>
+                    <div id="sor-navigation-container" class="hidden"></div>
                     <div id="post-creation-form">
                         <textarea id="post-text-input" placeholder="Что у вас нового?" maxlength="280"></textarea>
-                        
+
                         <div id="post-image-preview-container" class="hidden">
                             <img id="post-image-preview" src="#" alt="Предпросмотр фото">
                             <button id="remove-post-image-btn">&times;</button>
                         </div>
-                        
+
                         <input type="file" id="post-image-input" class="hidden" accept="image/*">
-                        
+
                         <div id="post-options">
                             <button id="attach-photo-btn" class="button secondary">Прикрепить фото</button>
                             <label><input type="checkbox" id="post-anonymous-checkbox"> Отправить анонимно</label>
@@ -216,7 +271,7 @@
     </div>
 
     <script src="script.js"></script>
-      <div id="announcement-overlay" class="hidden">
+    <div id="announcement-overlay" class="hidden">
         <div id="announcement-modal">
             <button id="announcement-close-btn">&times;</button>
             <h3>Сообщение от администрации</h3>
@@ -230,7 +285,7 @@
             <img id="image-modal-img" src="#" alt="Просмотр изображения">
         </div>
     </div>
-    
+
     <div id="compare-modal-overlay" class="hidden">
         <div id="compare-modal">
             <button id="compare-modal-close-btn">&times;</button>
@@ -245,7 +300,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="compare-view" class="hidden">
         <div class="content-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -262,4 +317,5 @@
         </div>
     </div>
 </body>
+
 </html>
