@@ -58,6 +58,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const removePostImageButton = document.getElementById('remove-post-image-btn');
     const leaderboardFilter = document.getElementById('leaderboard-filter-complete');
 
+    // Initialize New Year Decorations
+    initSnow();
+    initGarland();
+
     auth.onAuthStateChanged(async (user) => {
         const userDisplayNameElement = document.getElementById('user-display-name');
         if (user) {
@@ -2766,6 +2770,85 @@ function positionIndicatorToElement(el, instant = false) {
     indicator.style.transform = `translateX(${finalX}px)`;
 
     navIndicatorPrevX = finalX;
+}
+
+// --- NEW YEAR DECORATIONS LOGIC ---
+
+function initSnow() {
+    const snowContainer = document.getElementById('snow-container');
+    if (!snowContainer) return;
+
+    const snowflakeCount = 50;
+    for (let i = 0; i < snowflakeCount; i++) {
+        const snowflake = document.createElement('div');
+        snowflake.classList.add('snowflake');
+
+        // Random size
+        const size = Math.random() * 5 + 2 + 'px';
+        snowflake.style.width = size;
+        snowflake.style.height = size;
+
+        // Random starting position and duration
+        snowflake.style.left = Math.random() * 100 + 'vw';
+        snowflake.style.animationDuration = Math.random() * 3 + 5 + 's'; // 5-8s duration
+        snowflake.style.animationDelay = Math.random() * 5 + 's';
+
+        snowContainer.appendChild(snowflake);
+    }
+}
+
+function initGarland() {
+    const garlandContainer = document.getElementById('garland-container');
+    if (!garlandContainer) return;
+
+    garlandContainer.innerHTML = ''; // Clear existing
+
+    // We want lights along the "wire" which is 10% to 90% width, curved down.
+    // Wire range: 10% to 90%. Total width 80%.
+    // Curve depth: approx 40px.
+    // Function for parabola: y = 4 * h * (x - 0.5)^2  (normalized x 0..1, inverted U?? no U)
+    // Normalized Parabola hanging: y = 4 * depth * (x - x^2) ?? 
+    // Let's us y = depth * (1 - (2x-1)^2) for simple arch.
+
+    const lightsCount = 24;
+    const containerWidth = garlandContainer.offsetWidth || 1200; // fallback
+    const startX = 0.10; // 10%
+    const endX = 0.90;   // 90%
+    const depth = 40;    // pixels depth
+
+    for (let i = 0; i < lightsCount; i++) {
+        const light = document.createElement('div');
+        light.classList.add('garland-light');
+
+        // normalized position along the wire (0 to 1)
+        const t = i / (lightsCount - 1);
+
+        // Actual horizontal percent position
+        // We use the same start/end as the CSS wire (10% to 90%)
+        const xPercent = (startX + t * (endX - startX)) * 100;
+
+        // Vertical Calculation (Ellipse Arc)
+        // Matches CSS border-radius: 0 0 50% 50% / 0 0 100% 100%
+        // Formula: y = depth * sqrt(1 - (2t - 1)^2)
+        // (2t - 1) maps 0..1 to -1..1 (x domain of unit semi-circle)
+
+        const arcY = Math.sqrt(1 - Math.pow(2 * t - 1, 2));
+        const y = depth * arcY;
+
+        light.style.left = `${xPercent}%`;
+        // -6px to center the 12px light vertically on the wire? 
+        // Or roughly on the wire. The wire is 2px thick.
+        // Let's vertically align exact center to wire.
+        light.style.top = `${y - 6}px`;
+
+        // Randomize blink
+        const duration = 0.8 + Math.random();
+        const delay = Math.random();
+        light.style.animationDuration = `${duration}s`;
+        light.style.animationDelay = `${delay}s`;
+
+        garlandContainer.appendChild(light);
+    }
 }
 
 // --- IMAGE ZOOM-MODAL HELPERS ---
