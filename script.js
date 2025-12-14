@@ -1,12 +1,12 @@
 // ВАШИ УЧЕТНЫЕ ДАННЫЕ FIREBASE
 const firebaseConfig = {
-  apiKey: "AIzaSyDIEydSnMe0r2xvqTo63N9DN676_DsNn0o",
-  authDomain: "ttfotgassessmentenhanced.firebaseapp.com",
-  projectId: "ttfotgassessmentenhanced",
-  databaseURL: "https://ttfotgassessmentenhanced-default-rtdb.firebaseio.com",
-  storageBucket: "ttfotgassessmentenhanced.appspot.com",
-  messagingSenderId: "1017801402503",
-  appId: "1:1017801402503:web:67e54f87ceec9760fff022"
+    apiKey: "AIzaSyDIEydSnMe0r2xvqTo63N9DN676_DsNn0o",
+    authDomain: "ttfotgassessmentenhanced.firebaseapp.com",
+    projectId: "ttfotgassessmentenhanced",
+    databaseURL: "https://ttfotgassessmentenhanced-default-rtdb.firebaseio.com",
+    storageBucket: "ttfotgassessmentenhanced.appspot.com",
+    messagingSenderId: "1017801402503",
+    appId: "1:1017801402503:web:67e54f87ceec9760fff022"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -24,6 +24,28 @@ let postsViewedInSession = {};
 let currentForumCategory = 'chat'; // 'chat' или 'homework'
 let adminUsersListeners = {}; // Для отслеживания lastSeen в админ панели
 let currentAdminPostsCategory = 'chat'; // Для админ панели постов
+let currentSorContext = { quarter: 1, subject: null, sorId: null };
+const sorStructure = {
+    1: {
+        "Английский язык": 4, "Биология": 3, "Всемирная история": 3, "География": 3, "Информатика": 2,
+        "Искусство": 2, "История Казахстана": 1, "Казахский язык и литература": 4,
+        "Математика": 3, "Русский язык и литература": 3, "Физика": 2, "Физическая культура": 2, "Химия": 2
+    },
+    2: {
+        "Английский язык": 4, "Биология": 4, "Всемирная история": 3, "География": 2, "Информатика": 2,
+        "Искусство": 2, "История Казахстана": 2, "Казахский язык и литература": 4,
+        "Математика": 3, "Русский язык и литература": 3, "Физика": 2, "Физическая культура": 2, "Химия": 2
+    }
+};
+
+function getCurrentPostsPath() {
+    if (currentForumCategory === 'sors') {
+        // Warning: if subject/sorId is null, this path is invalid for writing, but handled in callers
+        if (!currentSorContext.subject || !currentSorContext.sorId) return 'sorPosts/invalid';
+        return `sorPosts/q${currentSorContext.quarter}/${currentSorContext.subject}/sor${currentSorContext.sorId}`;
+    }
+    return currentForumCategory === 'homework' ? 'homeworkPosts' : 'posts';
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     const appContainer = document.getElementById('app-container');
@@ -35,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const postImageInput = document.getElementById('post-image-input');
     const removePostImageButton = document.getElementById('remove-post-image-btn');
     const leaderboardFilter = document.getElementById('leaderboard-filter-complete');
-    
+
     auth.onAuthStateChanged(async (user) => {
         const userDisplayNameElement = document.getElementById('user-display-name');
         if (user) {
@@ -43,12 +65,12 @@ document.addEventListener('DOMContentLoaded', () => {
             currentUser = user;
             authOverlay.classList.add('hidden');
             appContainer.classList.remove('hidden');
-            
+
             // Обновляем время последней активности
             updateUserLastSeen();
             // Устанавливаем интервал для обновления каждые 30 секунд
             setInterval(updateUserLastSeen, 30000);
-            
+
             loadUserData().then(() => { handleUrlParams(); });
         } else {
             currentUser = null;
@@ -166,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadUserData();
                 document.getElementById('profile-cancel-btn').click();
             }).catch(err => {
-                 errorElement.textContent = 'Ошибка при сохранении: ' + err.message;
+                errorElement.textContent = 'Ошибка при сохранении: ' + err.message;
             });
             return;
         }
@@ -220,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     leaderboardFilter.addEventListener('change', renderLeaderboard);
-    
+
     // Обработчик выбора четверти в лидерборде
     document.getElementById('leaderboard-quarter-selector').addEventListener('click', (e) => {
         if (e.target.classList.contains('q-btn')) {
@@ -233,13 +255,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     profilePictureContainer.addEventListener('click', () => profilePictureInput.click());
     profilePictureInput.addEventListener('change', handleProfilePictureUpload);
-    
+
     attachPhotoButton.addEventListener('click', () => postImageInput.click());
     postImageInput.addEventListener('change', handlePostImageSelection);
     removePostImageButton.addEventListener('click', removeSelectedPostImage);
-    
+
     document.getElementById('submit-post-btn').addEventListener('click', handlePostSubmit);
-    
+
     // Обработчик переключения категорий форума
     document.addEventListener('click', (e) => {
         if (e.target.classList.contains('forum-category-btn')) {
@@ -308,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('admin-tab-posts').addEventListener('click', () => switchAdminTab('posts'));
     document.getElementById('admin-tab-prefixes').addEventListener('click', () => switchAdminTab('prefixes'));
     document.getElementById('admin-tab-messages').addEventListener('click', () => switchAdminTab('messages'));
-    
+
     // Обработчики для модального окна сравнения
     document.getElementById('compare-modal-close-btn').addEventListener('click', () => {
         document.getElementById('compare-modal-overlay').classList.add('hidden');
@@ -353,7 +375,7 @@ function generatePrefixesHtml(prefixes) {
 
 function getNewQuarterData() {
     return JSON.parse(JSON.stringify({
-        "section": { "Английский язык": [{ name: "Listening", max: 5, userResult: "" },{ name: "Reading", max: 6, userResult: "" },{ name: "Writing", max: 7, userResult: "" },{ name: "Speaking", max: 6, userResult: "" }], "Биология": [{ name: "7.1A Разнообразие живых организмов", max: 18, userResult: "" },{ name: "7.1B Клеточная биология", max: 13, userResult: "" },{ name: "7.1C Вода и органические вещества", max: 12, userResult: "" }], "Всемирная история": [{ name: "Раздел 7.1A Падение Римской империи", max: 12, userResult: "" },{ name: "Раздел 7.1B Феодализм", max: 3, userResult: "" },{ name: "Раздел 7.1C История ислама", max: 15, userResult: "" }], "География": [{ name: "Географиялық зерттеу әдістері", max: 7, userResult: "" },{ name: "Картография және географиялық деректер ...", max: 10, userResult: "" },{ name: "Физикалық география \"Литосфера\"", max: 14, userResult: "" }], "Информатика": [{ name: "7.1A Социальная безопасность", max: 14, userResult: "" },{ name: "Раздел 7.1B - Аппаратное и программное об...", max: 12, userResult: "" }], "Искусство": [{ name: "Раздел 1. Портрет", max: 10, userResult: "" },{ name: "Раздел 1. Музыкальная грамотность", max: 5, userResult: "" }], "История Казахстана": [{ name: "Бөлім 7.1A VI – IX ғғ. Қазақстан", max: 14, userResult: "" }], "Казахский язык и литература": [{ name: "Тыңдалым", max: 10, userResult: "" },{ name: "Айтылым", max: 10, userResult: "" },{ name: "Оқылым", max: 20, userResult: "" },{ name: "Жазылым", max: 10, userResult: "" }], "Математика": [{ name: "7.1A Начальные геометрические сведения", max: 13, userResult: "" },{ name: "7.1B Математическое моделирование тексто...", max: 13, userResult: "" },{ name: "7.1C Степень с целым показателем", max: 16, userResult: "" }], "Русский язык и литература": [{ name: "слушание и говорение", max: 7, userResult: "" },{ name: "письмо.", max: 10, userResult: "" },{ name: "чтение.", max: 10, userResult: "" }], "Физика": [{ name: "7.1A Физические величины и измерения", max: 16, userResult: "" },{ name: "Движение", max: 16, userResult: "" }], "Физическая культура": [{ name: "Раздел 1 - Легкая атлетика", max: 10, userResult: "" },{ name: "Раздел 2 - Взаимодействие в командных сп...", max: 10, userResult: "" }], "Химия": [{ name: "7.1A Введение в химию. Элементы, соедине...", max: 18, userResult: "" },{ name: "7.1B Изменения агрегатного состояния веще...", max: 22, userResult: "" }] },
+        "section": { "Английский язык": [{ name: "Listening", max: 5, userResult: "" }, { name: "Reading", max: 6, userResult: "" }, { name: "Writing", max: 7, userResult: "" }, { name: "Speaking", max: 6, userResult: "" }], "Биология": [{ name: "7.1A Разнообразие живых организмов", max: 18, userResult: "" }, { name: "7.1B Клеточная биология", max: 13, userResult: "" }, { name: "7.1C Вода и органические вещества", max: 12, userResult: "" }], "Всемирная история": [{ name: "Раздел 7.1A Падение Римской империи", max: 12, userResult: "" }, { name: "Раздел 7.1B Феодализм", max: 3, userResult: "" }, { name: "Раздел 7.1C История ислама", max: 15, userResult: "" }], "География": [{ name: "Географиялық зерттеу әдістері", max: 7, userResult: "" }, { name: "Картография және географиялық деректер ...", max: 10, userResult: "" }, { name: "Физикалық география \"Литосфера\"", max: 14, userResult: "" }], "Информатика": [{ name: "7.1A Социальная безопасность", max: 14, userResult: "" }, { name: "Раздел 7.1B - Аппаратное и программное об...", max: 12, userResult: "" }], "Искусство": [{ name: "Раздел 1. Портрет", max: 10, userResult: "" }, { name: "Раздел 1. Музыкальная грамотность", max: 5, userResult: "" }], "История Казахстана": [{ name: "Бөлім 7.1A VI – IX ғғ. Қазақстан", max: 14, userResult: "" }], "Казахский язык и литература": [{ name: "Тыңдалым", max: 10, userResult: "" }, { name: "Айтылым", max: 10, userResult: "" }, { name: "Оқылым", max: 20, userResult: "" }, { name: "Жазылым", max: 10, userResult: "" }], "Математика": [{ name: "7.1A Начальные геометрические сведения", max: 13, userResult: "" }, { name: "7.1B Математическое моделирование тексто...", max: 13, userResult: "" }, { name: "7.1C Степень с целым показателем", max: 16, userResult: "" }], "Русский язык и литература": [{ name: "слушание и говорение", max: 7, userResult: "" }, { name: "письмо.", max: 10, userResult: "" }, { name: "чтение.", max: 10, userResult: "" }], "Физика": [{ name: "7.1A Физические величины и измерения", max: 16, userResult: "" }, { name: "Движение", max: 16, userResult: "" }], "Физическая культура": [{ name: "Раздел 1 - Легкая атлетика", max: 10, userResult: "" }, { name: "Раздел 2 - Взаимодействие в командных сп...", max: 10, userResult: "" }], "Химия": [{ name: "7.1A Введение в химию. Элементы, соедине...", max: 18, userResult: "" }, { name: "7.1B Изменения агрегатного состояния веще...", max: 22, userResult: "" }] },
         "quarter": { "Английский язык": [{ name: "Listening", max: 6, userResult: "" }, { name: "Reading", max: 6, userResult: "" }, { name: "Writing", max: 6, userResult: "" }, { name: "Speaking", max: 6, userResult: "" }], "Биология": [{ name: "7.1A Разнообразие живых организмов", max: 8, userResult: "" }, { name: "7.1B Клеточная биология", max: 10, userResult: "" }, { name: "7.1C Вода и органические вещества", max: 12, userResult: "" }], "Всемирная история": [{ name: "Раздел 7.1A Падение Римской империи", max: 9, userResult: "" }, { name: "Раздел 7.1B Феодализм", max: 10, userResult: "" }, { name: "Раздел 7.1C История ислама", max: 6, userResult: "" }], "География": [{ name: "Географиялық зерттеу әдістері", max: 4, userResult: "" }, { name: "Картография және географиялық деректер ...", max: 11, userResult: "" }, { name: "Физикалық география \"Литосфера\"", max: 10, userResult: "" }], "Информатика": [{ name: "7.1A Социальная безопасность", max: 4, userResult: "" }, { name: "Раздел 7.1B - Аппаратное и программное об...", max: 16, userResult: "" }], "Искусство": [{ name: "Раздел 1. Портрет", max: 15, userResult: "" }, { name: "Раздел 1. Музыкальная грамотность", max: 15, userResult: "" }], "История Казахстана": [{ name: "Бөлім 7.1A VI – IX ғғ. Қазақстан", max: 25, userResult: "" }], "Казахский язык и литература": [{ name: "Тыңдалым", max: 10, userResult: "" }, { name: "Айтылым", max: 10, userResult: "" }, { name: "Оқылым", max: 10, userResult: "" }, { name: "Жазылым", max: 10, userResult: "" }], "Математика": [{ name: "7.1A Начальные геометрические сведения", max: 7, userResult: "" }, { name: "7.1B Математическое моделирование тексто...", max: 6, userResult: "" }, { name: "7.1C Степень с целым показателем", max: 17, userResult: "" }], "Русский язык и литература": [{ name: "слушание и говорение", max: 10, userResult: "" }, { name: "письмо.", max: 10, userResult: "" }, { name: "чтение.", max: 10, userResult: "" }], "Физика": [{ name: "7.1A Физические величины и измерения", max: 12, userResult: "" }, { name: "Движение", max: 18, userResult: "" }], "Физическая культура": [], "Химия": [{ name: "7.1A Введение в химию. Элементы, соедине...", max: 16, userResult: "" }, { name: "7.1B Изменения агрегатного состояния веще...", max: 14, userResult: "" }] }
     }));
 }
@@ -373,12 +395,12 @@ function formatLastSeen(timestamp) {
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
-    
+
     if (minutes < 1) return 'Только что';
     if (minutes < 60) return `${minutes} ${minutes === 1 ? 'минуту' : minutes < 5 ? 'минуты' : 'минут'} назад`;
     if (hours < 24) return `${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'} назад`;
     if (days < 7) return `${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'} назад`;
-    
+
     const date = new Date(timestamp);
     return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
@@ -390,7 +412,7 @@ function loadUserData() {
         const profileClass = document.getElementById('profile-class');
         const privacyCheckbox = document.getElementById('privacy-checkbox');
         const profilePictureImg = document.getElementById('profile-picture-img');
-        
+
         db.ref(`users/${currentUser.uid}`).once('value').then(snapshot => {
             const data = snapshot.val() || {};
             userProfile = data.profile || {};
@@ -425,7 +447,7 @@ function loadUserData() {
     });
 }
 function renderApp() { renderSidebar(); renderMainContent(); const dataForQuarter = allGradesData[`q${currentQuarter}`]; if (dataForQuarter && dataForQuarter.section) { Object.keys(dataForQuarter.section).forEach(calculateAndUpdateSubject); } }
-function navigateTo(viewName) { 
+function navigateTo(viewName) {
     if (postsRef && postsListener) {
         postsRef.off('value', postsListener);
         postsRef = null;
@@ -437,14 +459,14 @@ function navigateTo(viewName) {
     }
     const views = { profile: document.getElementById('profile-view'), grades: document.getElementById('grades-view'), stats: document.getElementById('stats-view'), users: document.getElementById('users-view'), leaderboard: document.getElementById('leaderboard-view'), chat: document.getElementById('chat-view'), admin: document.getElementById('admin-panel-view'), compare: document.getElementById('compare-view') };
     const navButtons = { profile: document.getElementById('nav-profile'), grades: document.getElementById('nav-grades'), stats: document.getElementById('nav-stats'), users: document.getElementById('nav-users'), leaderboard: document.getElementById('nav-leaderboard'), chat: document.getElementById('nav-chat'), admin: document.getElementById('nav-admin') };
-    Object.values(views).forEach(v => v && v.classList.add('hidden')); 
-    Object.values(navButtons).forEach(b => b && b.classList.remove('active')); 
+    Object.values(views).forEach(v => v && v.classList.add('hidden'));
+    Object.values(navButtons).forEach(b => b && b.classList.remove('active'));
     if (views[viewName]) views[viewName].classList.remove('hidden');
-    if (navButtons[viewName]) navButtons[viewName].classList.add('active'); 
-    if (viewName === 'stats') { renderStatisticsView('stats-results-container', allGradesData); } 
-    if (viewName === 'profile') { renderProfileDashboard(); } 
-    if (viewName === 'leaderboard') { renderLeaderboard(); } 
-    if (viewName === 'chat') { renderChatView(); } 
+    if (navButtons[viewName]) navButtons[viewName].classList.add('active');
+    if (viewName === 'stats') { renderStatisticsView('stats-results-container', allGradesData); }
+    if (viewName === 'profile') { renderProfileDashboard(); }
+    if (viewName === 'leaderboard') { renderLeaderboard(); }
+    if (viewName === 'chat') { renderChatView(); }
     if (viewName === 'admin') { renderAdminPanel(); }
     if (viewName === 'users') { renderUsersView(); }
 }
@@ -454,9 +476,9 @@ function renderStatisticsView(containerId, gradesData, isFriend = false) {
     let statsQuarter = 1;
     const activeQBtn = document.querySelector(`${quarterSelectorId} .q-btn.active`);
     if (activeQBtn) { statsQuarter = activeQBtn.dataset.quarter; }
-    
+
     const quarterData = gradesData[`q${statsQuarter}`];
-    
+
     container.innerHTML = `<div class="gauge-container"><svg viewBox="0 0 100 50" class="gauge"><path class="gauge-bg" d="M 10 50 A 40 40 0 0 1 90 50"></path><path class="gauge-fg" d="M 10 50 A 40 40 0 0 1 90 50"></path></svg><div class="gauge-text">--</div><div class="gauge-min-max"><span>2</span><span>5</span></div></div><div class="stats-avg-grade-text"></div><div class="stats-details"><div class="stat-item"><strong>Средний %:</strong><span>--</span></div><div class="stat-item"><strong>Лучший предмет:</strong><span>--</span></div><div class="stat-item"><strong>Худший предмет:</strong><span>--</span></div></div>`;
 
     if (!quarterData) {
@@ -540,14 +562,14 @@ let allUsersByClass = {};
 async function renderUsersView() {
     const classesContainer = document.getElementById('classes-container');
     const usersListContainer = document.getElementById('users-list-container');
-    
+
     classesContainer.innerHTML = '<p>Загрузка пользователей...</p>';
-    
+
     try {
         // Загружаем только публичных пользователей через правильный запрос
         const usersRef = db.ref('users');
         const publicUsersSnapshot = await usersRef.orderByChild('profile/isPublic').equalTo(true).once('value');
-        
+
         // Также загружаем свой собственный профиль, если он приватный
         let ownProfile = null;
         if (currentUser) {
@@ -560,23 +582,23 @@ async function renderUsersView() {
                 // Игнорируем ошибки при загрузке собственного профиля
             }
         }
-        
+
         // Группируем пользователей по классам
         allUsersByClass = {};
         const classOrder = ['7a', '7b', '7c', '7d', '7e', '7f', '7g', '7h', '7i', '7j'];
-        
+
         // Создаем Set для отслеживания уже добавленных UID
         const addedUids = new Set();
-        
+
         // Добавляем публичных пользователей
         if (publicUsersSnapshot.exists()) {
             publicUsersSnapshot.forEach(childSnapshot => {
                 const user = childSnapshot.val();
                 if (!user.profile || !user.profile.class) return;
-                
+
                 const userClass = user.profile.class.toLowerCase().trim();
                 const uid = childSnapshot.key;
-                
+
                 // Проверяем, не добавлен ли уже этот пользователь
                 if (!addedUids.has(uid)) {
                     if (!allUsersByClass[userClass]) {
@@ -590,7 +612,7 @@ async function renderUsersView() {
                 }
             });
         }
-        
+
         // Добавляем свой профиль, если он еще не добавлен (независимо от того, публичный он или приватный)
         if (ownProfile && ownProfile.profile && ownProfile.profile.class) {
             const userClass = ownProfile.profile.class.toLowerCase().trim();
@@ -602,14 +624,14 @@ async function renderUsersView() {
                 addedUids.add(ownProfile.uid);
             }
         }
-        
+
         // Сортируем пользователей в каждом классе по имени
         Object.keys(allUsersByClass).forEach(className => {
-            allUsersByClass[className].sort((a, b) => 
+            allUsersByClass[className].sort((a, b) =>
                 (a.profile.username || '').localeCompare(b.profile.username || '')
             );
         });
-        
+
         // Отображаем классы
         let classesHtml = '';
         classOrder.forEach(className => {
@@ -621,9 +643,9 @@ async function renderUsersView() {
                 </div>
             `;
         });
-        
+
         classesContainer.innerHTML = classesHtml;
-        
+
         // Добавляем обработчики кликов на классы
         classesContainer.querySelectorAll('.class-card').forEach(card => {
             card.addEventListener('click', () => {
@@ -633,9 +655,9 @@ async function renderUsersView() {
                 renderUsersForClass(selectedClass);
             });
         });
-        
+
         usersListContainer.classList.add('hidden');
-        
+
     } catch (error) {
         console.error("Ошибка при загрузке пользователей:", error);
         classesContainer.innerHTML = '<p>Не удалось загрузить пользователей.</p>';
@@ -645,13 +667,13 @@ async function renderUsersView() {
 function renderUsersForClass(className) {
     const usersListContainer = document.getElementById('users-list-container');
     const users = allUsersByClass[className] || [];
-    
+
     if (users.length === 0) {
         usersListContainer.innerHTML = '<p>В этом классе нет пользователей.</p>';
         usersListContainer.classList.remove('hidden');
         return;
     }
-    
+
     let usersHtml = `
         <div class="users-list-header">
             <h4>Пользователи класса ${className.toUpperCase()}</h4>
@@ -659,7 +681,7 @@ function renderUsersForClass(className) {
         </div>
         <div class="users-grid">
     `;
-    
+
     users.forEach(user => {
         const photoURL = user.profile.photoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png';
         const prefixesHtml = generatePrefixesHtml(user.profile.prefixes || []);
@@ -673,11 +695,11 @@ function renderUsersForClass(className) {
             </div>
         `;
     });
-    
+
     usersHtml += '</div>';
     usersListContainer.innerHTML = usersHtml;
     usersListContainer.classList.remove('hidden');
-    
+
     // Добавляем обработчики кликов на пользователей
     usersListContainer.querySelectorAll('.user-card').forEach(card => {
         card.addEventListener('click', () => {
@@ -691,32 +713,32 @@ function renderUsersForClass(className) {
 async function handleUserCardClick(uid, username) {
     const resultsContainer = document.getElementById('friend-results-container');
     resultsContainer.innerHTML = '<p class="no-data-message">Загрузка...</p>';
-    
+
     try {
         const userSnapshot = await db.ref(`users/${uid}`).once('value');
         if (!userSnapshot.exists()) {
             resultsContainer.innerHTML = '<p class="no-data-message">Пользователь не найден.</p>';
             return;
         }
-        
+
         const friendData = userSnapshot.val();
         if (!friendData || !friendData.profile) {
             resultsContainer.innerHTML = '<p class="no-data-message">Данные пользователя не найдены.</p>';
             return;
         }
-        
+
         // Проверяем приватность профиля
         if (!friendData.profile.isPublic) {
             resultsContainer.innerHTML = '<p class="no-data-message">Этот аккаунт приватный. Вы не можете просматривать его данные.</p>';
             return;
         }
-        
+
         // Передаем uid в функцию renderFriendData
         renderFriendData(friendData, resultsContainer, uid);
-        
+
         // Прокручиваем к результатам поиска
         resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        
+
     } catch (error) {
         console.error("Ошибка при загрузке данных пользователя:", error);
         resultsContainer.innerHTML = '<p class="no-data-message">Не удалось загрузить данные пользователя.</p>';
@@ -794,7 +816,7 @@ function renderMainContent() {
     const data = dataForQuarter[currentTabId]?.[currentSubject];
     let tableHTML = `<div class="table-wrapper"><table><thead><tr><th></th><th>Наименование</th><th>Результат</th><th>Максимум</th></tr></thead><tbody>`;
     if (!data || data.length === 0) { contentDisplay.innerHTML = `<div class="no-data-message">Данные отсутствуют.</div>`; return; }
-    
+
     data.forEach((item, index) => {
         const resultValue = (item.userResult !== null && item.userResult !== undefined && item.userResult !== '') ? item.userResult : '';
         tableHTML += `
@@ -805,7 +827,7 @@ function renderMainContent() {
                 <td><input type="number" class="max-score-input" value="${item.max}" data-subject="${currentSubject}" data-tab="${currentTabId}" data-index="${index}"></td>
             </tr>`;
     });
-    
+
     tableHTML += `</tbody></table></div>`;
     contentDisplay.innerHTML = tableHTML;
     contentDisplay.querySelectorAll('input[type="text"]').forEach(input => {
@@ -830,7 +852,7 @@ function renderSidebar() {
     const selectedRow = myGradesSidebarBody.querySelector(`tr[data-subject="${currentSubject}"]`);
     if (selectedRow) selectedRow.classList.add('selected');
     myGradesSidebarBody.querySelectorAll('tr').forEach(row => {
-        row.addEventListener('click', function() {
+        row.addEventListener('click', function () {
             if (myGradesSidebarBody.querySelector('.selected')) {
                 myGradesSidebarBody.querySelector('.selected').classList.remove('selected');
             }
@@ -875,11 +897,11 @@ function renderFriendData(friendData, container, friendUid = null) {
         </div>`;
     let fq = 1, ft = 'section', fs = "Английский язык";
     const friendStatsQSelector = document.getElementById('friend-stats-q-selector'); const friendGradesQSelector = document.getElementById('friend-grades-q-selector'); const friendTabs = document.getElementById('friend-tabs');
-    const renderFriendGradesView = () => { const sb = document.getElementById('friend-sidebar-body'); const cd = document.getElementById('friend-content-display'); const qd = friendGrades[`q${fq}`] || getNewQuarterData(); sb.innerHTML = ''; Object.keys(qd.section).forEach((s, i) => { const p = calculateFinalPercentageForFriend(s, qd); const g = getGradeFromPercentage(p); const r = document.createElement('tr'); r.dataset.subject = s; r.innerHTML = `<td>${i + 1}</td><td>${s}</td><td class="subject-percentage">${(p !== null && p >= 0) ? p.toFixed(2) + ' %' : '-- %'}</td><td class="subject-grade">${(p !== null && p >= 0) ? g : '-'}</td>`; if (s === fs) r.classList.add('selected'); sb.appendChild(r); }); const d = qd[ft]?.[fs]; let th = `<div class="table-wrapper"><table><thead><tr><th></th><th>Наименование</th><th>Результат</th><th>Максимум</th></tr></thead><tbody>`; if (d && d.length > 0) { d.forEach((i, x) => { th += `<tr><td>${x + 1}</td><td>${i.name}</td><td class="readonly-result">${i.userResult || '-'}</td><td class="max-col">${i.max}</td></tr>`; }); } th += `</tbody></table></div>`; cd.innerHTML = th; sb.querySelectorAll('tr').forEach(r => r.addEventListener('click', function() { fs = this.dataset.subject; renderFriendGradesView(); })); };
+    const renderFriendGradesView = () => { const sb = document.getElementById('friend-sidebar-body'); const cd = document.getElementById('friend-content-display'); const qd = friendGrades[`q${fq}`] || getNewQuarterData(); sb.innerHTML = ''; Object.keys(qd.section).forEach((s, i) => { const p = calculateFinalPercentageForFriend(s, qd); const g = getGradeFromPercentage(p); const r = document.createElement('tr'); r.dataset.subject = s; r.innerHTML = `<td>${i + 1}</td><td>${s}</td><td class="subject-percentage">${(p !== null && p >= 0) ? p.toFixed(2) + ' %' : '-- %'}</td><td class="subject-grade">${(p !== null && p >= 0) ? g : '-'}</td>`; if (s === fs) r.classList.add('selected'); sb.appendChild(r); }); const d = qd[ft]?.[fs]; let th = `<div class="table-wrapper"><table><thead><tr><th></th><th>Наименование</th><th>Результат</th><th>Максимум</th></tr></thead><tbody>`; if (d && d.length > 0) { d.forEach((i, x) => { th += `<tr><td>${x + 1}</td><td>${i.name}</td><td class="readonly-result">${i.userResult || '-'}</td><td class="max-col">${i.max}</td></tr>`; }); } th += `</tbody></table></div>`; cd.innerHTML = th; sb.querySelectorAll('tr').forEach(r => r.addEventListener('click', function () { fs = this.dataset.subject; renderFriendGradesView(); })); };
     const renderFriendDataViews = () => { renderStatisticsView('friend-stats-results-container', friendGrades, true); renderFriendGradesView(); };
-    const handleFriendQSelector = (e) => { if (e.target.classList.contains('q-btn')) { fq = parseInt(e.target.dataset.quarter, 10); friendStatsQSelector.querySelector('.active').classList.remove('active'); friendGradesQSelector.querySelector('.active').classList.remove('active'); friendStatsQSelector.children[fq-1].classList.add('active'); friendGradesQSelector.children[fq-1].classList.add('active'); renderFriendDataViews(); }};
+    const handleFriendQSelector = (e) => { if (e.target.classList.contains('q-btn')) { fq = parseInt(e.target.dataset.quarter, 10); friendStatsQSelector.querySelector('.active').classList.remove('active'); friendGradesQSelector.querySelector('.active').classList.remove('active'); friendStatsQSelector.children[fq - 1].classList.add('active'); friendGradesQSelector.children[fq - 1].classList.add('active'); renderFriendDataViews(); } };
     friendStatsQSelector.addEventListener('click', handleFriendQSelector); friendGradesQSelector.addEventListener('click', handleFriendQSelector);
-    friendTabs.addEventListener('click', e => { if (e.target.classList.contains('tab')) { friendTabs.querySelector('.active').classList.remove('active'); e.target.classList.add('active'); ft = e.target.dataset.tabId; renderFriendGradesView(); }});
+    friendTabs.addEventListener('click', e => { if (e.target.classList.contains('tab')) { friendTabs.querySelector('.active').classList.remove('active'); e.target.classList.add('active'); ft = e.target.dataset.tabId; renderFriendGradesView(); } });
     renderFriendDataViews();
 }
 
@@ -910,7 +932,7 @@ function userHasAllGrades(gradesData, selectedQuarter = null) {
     if (!gradesData || Object.keys(gradesData).length === 0) {
         return false;
     }
-    
+
     // Если выбрана конкретная четверть, проверяем только её
     if (selectedQuarter !== null) {
         const qKey = `q${selectedQuarter}`;
@@ -923,24 +945,24 @@ function userHasAllGrades(gradesData, selectedQuarter = null) {
         }
         return false;
     }
-    
+
     // Если четверть не выбрана, проверяем все существующие четверти
     // Пользователь проходит фильтр, если хотя бы одна четверть полностью заполнена
     const quarters = ['q1', 'q2', 'q3', 'q4'];
     let hasAtLeastOneCompleteQuarter = false;
-    
+
     for (const qKey of quarters) {
         if (gradesData.hasOwnProperty(qKey) && gradesData[qKey]) {
             const quarter = gradesData[qKey];
             const hasAnyData = quarter.section && Object.keys(quarter.section).length > 0;
-            
+
             if (hasAnyData && isQuarterComplete(quarter)) {
                 hasAtLeastOneCompleteQuarter = true;
                 break; // Достаточно одной полностью заполненной четверти
             }
         }
     }
-    
+
     return hasAtLeastOneCompleteQuarter;
 }
 
@@ -953,9 +975,9 @@ async function renderLeaderboard() {
     try {
         const usersRef = db.ref('users');
         const snapshot = await usersRef.orderByChild('profile/isPublic').equalTo(true).once('value');
-        
+
         if (!snapshot.exists()) {
-            container.innerHTML = '<p>Нет публичных профилей для отображения.</p>'; 
+            container.innerHTML = '<p>Нет публичных профилей для отображения.</p>';
             return;
         }
 
@@ -985,7 +1007,7 @@ async function renderLeaderboard() {
                     egrPoints: egrPoints
                 });
             }
-            
+
         });
 
         if (leaderboardData.length === 0) {
@@ -1053,7 +1075,7 @@ async function renderLeaderboard() {
 function calculateOverallStats(gradesData, selectedQuarter = null) {
     const allPercentages = [];
     const allGrades = [];
-    
+
     if (selectedQuarter !== null) {
         // Если выбрана конкретная четверть, считаем только её
         const qKey = `q${selectedQuarter}`;
@@ -1090,11 +1112,11 @@ function calculateOverallStats(gradesData, selectedQuarter = null) {
             }
         }
     }
-    
+
     if (allPercentages.length === 0) {
         return { averagePercentage: 0, averageGrade: 0 };
     }
-    
+
     const avgPercentage = allPercentages.reduce((a, b) => a + b, 0) / allPercentages.length;
     const avgGrade = allGrades.reduce((a, b) => a + b, 0) / allGrades.length;
     return { averagePercentage: avgPercentage, averageGrade: avgGrade };
@@ -1144,7 +1166,7 @@ function calculateEGR(gradesData, selectedQuarter = null) {
         });
     } else {
         // All quarters: include subjects from all quarters where they are complete per quarter
-        ['q1','q2','q3','q4'].forEach(qKey => {
+        ['q1', 'q2', 'q3', 'q4'].forEach(qKey => {
             const quarterData = gradesData[qKey];
             if (!quarterData) return;
             const subjects = Object.keys(quarterData.section || {}).concat(Object.keys(quarterData.quarter || {}));
@@ -1198,7 +1220,9 @@ async function handlePostSubmit() {
         postData.imageURL = imageURL;
     }
     // Выбираем правильную базу данных в зависимости от категории
-    const postsRef = currentForumCategory === 'homework' ? db.ref('homeworkPosts') : db.ref('posts');
+    const path = getCurrentPostsPath();
+    if (path === 'sorPosts/invalid') { alert('Ошибка: не выбран СОР.'); submitBtn.classList.remove('loading'); submitBtn.disabled = false; return; }
+    const postsRef = db.ref(path);
     postsRef.push(postData)
         .then(() => {
             postTextInput.value = '';
@@ -1214,39 +1238,72 @@ async function handlePostSubmit() {
             submitBtn.disabled = false;
         });
 }
-function handleDeletePost(postId) { 
-    const postsRef = currentForumCategory === 'homework' ? db.ref('homeworkPosts') : db.ref('posts');
-    postsRef.child(postId).remove().catch(error => { 
-        console.error("Ошибка при удалении поста:", error); 
-        alert("Не удалось удалить пост. У вас может не быть прав на это действие."); 
-    }); 
+function handleDeletePost(postId) {
+    const postsRef = db.ref(getCurrentPostsPath());
+    postsRef.child(postId).remove().catch(error => {
+        console.error("Ошибка при удалении поста:", error);
+        alert("Не удалось удалить пост. У вас может не быть прав на это действие.");
+    });
 }
 function formatTimestamp(ts) { const date = new Date(ts); return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 
 function renderChatView() {
     const postsContainer = document.getElementById('posts-container');
-    
+    const sorNavContainer = document.getElementById('sor-navigation-container');
+    const postCreationForm = document.getElementById('post-creation-form');
+
     // Отключаем предыдущий listener, если он существует
     if (postsRef && postsListener) {
         postsRef.off('value', postsListener);
+        postsRef = null;
     }
-    
-    // Выбираем правильную базу данных в зависимости от категории
-    const postsPath = currentForumCategory === 'homework' ? 'homeworkPosts' : 'posts';
+
+    if (currentForumCategory === 'sors') {
+        postCreationForm.classList.add('hidden');
+        if (currentSorContext.subject && currentSorContext.sorId) {
+            sorNavContainer.classList.add('hidden');
+            postsContainer.classList.remove('hidden');
+            postCreationForm.classList.remove('hidden');
+
+            postsContainer.innerHTML = `
+                <div style="margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;">
+                    <button class="button secondary" onclick="handleBackToSorList()">← Назад</button>
+                    <span style="font-weight: bold;">${currentSorContext.subject} - ${currentSorContext.sorId}-й СОР (Четверть ${currentSorContext.quarter})</span>
+                </div>
+                <div id="posts-list"></div>
+             `;
+
+            const path = `sorPosts/q${currentSorContext.quarter}/${currentSorContext.subject}/sor${currentSorContext.sorId}`;
+            setupPostsListener(path, document.getElementById('posts-list'));
+        } else {
+            sorNavContainer.classList.remove('hidden');
+            postsContainer.classList.add('hidden');
+            renderSorNavigation();
+        }
+    } else {
+        sorNavContainer.classList.add('hidden');
+        postsContainer.classList.remove('hidden');
+        postCreationForm.classList.remove('hidden');
+        const postsPath = currentForumCategory === 'homework' ? 'homeworkPosts' : 'posts';
+        setupPostsListener(postsPath, postsContainer);
+    }
+}
+
+function setupPostsListener(postsPath, container) {
     postsRef = db.ref(postsPath).orderByChild('timestamp').limitToLast(100);
 
     postsListener = (snapshot) => {
-        postsContainer.innerHTML = '';
+        container.innerHTML = '';
         if (!snapshot.exists()) {
-            postsContainer.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Здесь пока нет постов. Будьте первым!</p>';
+            container.innerHTML = '<p style="text-align: center; color: var(--text-muted);">Здесь пока нет постов. Будьте первым!</p>';
             return;
         }
-        
+
         const postsData = [];
         snapshot.forEach(childSnapshot => {
             postsData.push({ id: childSnapshot.key, ...childSnapshot.val() });
         });
-        
+
         let postsHtml = '';
         postsData.reverse().forEach(post => {
             const postKey = `${postsPath}_${post.id}`;
@@ -1258,10 +1315,13 @@ function renderChatView() {
             const likes = post.likes || {};
             const likeCount = Object.keys(likes).length;
             const isLikedByCurrentUser = currentUser && likes[currentUser.uid];
-            
+
+            const replies = post.replies || {};
+            const replyCount = Object.keys(replies).length;
+
             const views = post.views || {};
             const viewCount = Object.keys(views).length;
-            
+
             let viewCounterHtml = '';
             if (currentUser && (post.uid === currentUser.uid || userProfile.isAdmin)) {
                 viewCounterHtml = `
@@ -1281,7 +1341,6 @@ function renderChatView() {
                     const canDeleteReply = currentUser && (reply.uid === currentUser.uid || userProfile.isAdmin);
                     const replyDeleteBtnHtml = canDeleteReply ? `<button class="reply-delete-btn" data-post-id="${post.id}" data-reply-id="${replyId}">&times;</button>` : '';
 
-                    // Отображаем префиксы в ответах
                     const replyPrefixesHtml = generatePrefixesHtml(reply.authorPrefixes);
 
                     repliesHtml += `
@@ -1305,12 +1364,11 @@ function renderChatView() {
                 repliesHtml += '</div>';
             }
 
-            // Отображаем префиксы в постах
             const postPrefixesHtml = generatePrefixesHtml(post.authorPrefixes);
-            let authorHtml = post.isAnonymous 
+            let authorHtml = post.isAnonymous
                 ? `<span class="post-author anonymous">${post.username}</span>`
                 : `<span class="post-author clickable-username" data-username="${post.username}">${post.username}</span> ${postPrefixesHtml}`;
-            
+
             const deleteButtonHtml = (currentUser && (post.uid === currentUser.uid || userProfile.isAdmin)) ? `<button class="post-delete-btn" data-post-id="${post.id}">&times;</button>` : '';
             const postImageHtml = post.imageURL ? `<img src="${post.imageURL}" class="post-image" alt="Прикрепленное изображение">` : '';
 
@@ -1333,7 +1391,7 @@ function renderChatView() {
                         </button>
                         <button class="reply-toggle-btn action-btn" data-post-id="${post.id}">
                              <svg viewBox="0 0 24 24"><path d="M9,22A1,1 0 0,1 8,21V18H4A2,2 0 0,1 2,16V4C2,2.89 2.9,2 4,2H20A2,2 0 0,1 22,4V16A2,2 0 0,1 20,18H13.9L10.2,21.71C10,21.9 9.75,22 9.5,22V22H9Z" /></svg>
-                             <span>Ответить</span>
+                             <span>${replyCount}</span>
                         </button>
                         ${viewCounterHtml}
                     </div>
@@ -1345,10 +1403,9 @@ function renderChatView() {
                 </div>
             `;
         });
-        postsContainer.innerHTML = postsHtml;
-        // Staggered reveal for posts
+        container.innerHTML = postsHtml;
         requestAnimationFrame(() => {
-            const cards = postsContainer.querySelectorAll('.post-card');
+            const cards = container.querySelectorAll('.post-card');
             cards.forEach((card, idx) => {
                 card.classList.add('reveal-item');
                 setTimeout(() => card.classList.add('visible'), idx * 60);
@@ -1357,20 +1414,20 @@ function renderChatView() {
     };
     postsRef.on('value', postsListener, (error) => {
         console.error("Ошибка при загрузке постов:", error);
-        postsContainer.innerHTML = '<p>Не удалось загрузить посты.</p>';
+        container.innerHTML = '<p>Не удалось загрузить посты.</p>';
     });
 }
 
 function handleLikeToggle(postId) {
     if (!currentUser) return;
-    const postsPath = currentForumCategory === 'homework' ? 'homeworkPosts' : 'posts';
+    const postsPath = getCurrentPostsPath();
     const likeRef = db.ref(`${postsPath}/${postId}/likes/${currentUser.uid}`);
     likeRef.transaction(currentData => (currentData ? null : true));
 }
 
 function handleReplyLikeToggle(postId, replyId) {
     if (!currentUser) return;
-    const postsPath = currentForumCategory === 'homework' ? 'homeworkPosts' : 'posts';
+    const postsPath = getCurrentPostsPath();
     const likeRef = db.ref(`${postsPath}/${postId}/replies/${replyId}/likes/${currentUser.uid}`);
     likeRef.transaction(currentData => (currentData ? null : true));
 }
@@ -1389,14 +1446,14 @@ function handleReplySubmit(postId) {
         // Сохраняем префиксы на момент ответа
         authorPrefixes: userProfile.prefixes || []
     };
-    const postsPath = currentForumCategory === 'homework' ? 'homeworkPosts' : 'posts';
+    const postsPath = getCurrentPostsPath();
     db.ref(`${postsPath}/${postId}/replies`).push(replyData)
         .then(() => { replyInput.value = ''; })
         .catch(error => { console.error("Ошибка при отправке ответа:", error); alert("Не удалось отправить ответ."); });
 }
 
 function handleDeleteReply(postId, replyId) {
-    const postsPath = currentForumCategory === 'homework' ? 'homeworkPosts' : 'posts';
+    const postsPath = getCurrentPostsPath();
     db.ref(`${postsPath}/${postId}/replies/${replyId}`).remove()
         .catch(error => { console.error("Ошибка при удалении ответа:", error); alert("Не удалось удалить ответ."); });
 }
@@ -1404,17 +1461,143 @@ function handleDeleteReply(postId, replyId) {
 async function uploadToCloudinary(file) {
     const CLOUD_NAME = "dqj6o60sc";
     const UPLOAD_PRESET = "ml_default";
-    const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', UPLOAD_PRESET);
-    
-    const response = await fetch(url, { method: 'POST', body: formData });
+    formData.append("file", file);
+    formData.append("upload_preset", UPLOAD_PRESET);
+
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+        method: "POST",
+        body: formData
+    });
+
     if (!response.ok) {
-        throw new Error('Ошибка при загрузке изображения в Cloudinary.');
+        throw new Error("Ошибка загрузки изображения");
     }
+
     const data = await response.json();
     return data.secure_url;
+}
+
+// --- SOR FUNCTIONALITY ---
+
+function renderSorNavigation() {
+    const container = document.getElementById('sor-navigation-container');
+    container.innerHTML = '';
+
+    // Level 1: Quarter Selection
+    if (!currentSorContext.quarter) {
+        currentSorContext.quarter = 1; // Default
+    }
+
+    const quarterSelector = document.createElement('div');
+    quarterSelector.className = 'quarter-selector';
+    [1, 2].forEach(q => {
+        const btn = document.createElement('button');
+        btn.className = `q-btn ${currentSorContext.quarter === q ? 'active' : ''}`;
+        btn.textContent = `${q} четверть`;
+        btn.addEventListener('click', () => {
+            currentSorContext.quarter = q;
+            currentSorContext.subject = null;
+            currentSorContext.sorId = null;
+            renderSorNavigation();
+        });
+        quarterSelector.appendChild(btn);
+    });
+    container.appendChild(quarterSelector);
+
+    // Level 2: Subject Selection
+    const subjectsDiv = document.createElement('div');
+    subjectsDiv.style.marginTop = '20px';
+
+    if (!currentSorContext.subject) {
+        subjectsDiv.innerHTML = '<h4>Выберите предмет:</h4>';
+        const subjectsList = document.createElement('div');
+        subjectsList.className = 'sor-subjects-list';
+        // Grid layout for subjects
+        subjectsList.style.display = 'grid';
+        subjectsList.style.gridTemplateColumns = 'repeat(auto-fill, minmax(200px, 1fr))';
+        subjectsList.style.gap = '10px';
+
+        const subjects = sorStructure[currentSorContext.quarter];
+        Object.keys(subjects).forEach(subject => {
+            const btn = document.createElement('button');
+            btn.className = 'button secondary';
+            btn.style.width = '100%';
+            btn.textContent = subject;
+            btn.addEventListener('click', () => {
+                currentSorContext.subject = subject;
+                renderSorNavigation();
+            });
+            subjectsList.appendChild(btn);
+        });
+        subjectsDiv.appendChild(subjectsList);
+    } else {
+        // Level 3: SOR Selection
+        subjectsDiv.innerHTML = `<h4>${currentSorContext.subject} <button class="button small secondary" onclick="handleBackToSubjectList()" style="margin-left:10px; font-size: 0.8em; padding: 2px 8px;">(Изменить предмет)</button></h4>`;
+        const sorsList = document.createElement('div');
+        sorsList.className = 'sor-list';
+        sorsList.style.display = 'flex';
+        sorsList.style.flexDirection = 'column';
+        sorsList.style.gap = '10px';
+
+        const sorCount = sorStructure[currentSorContext.quarter][currentSorContext.subject];
+        for (let i = 1; i <= sorCount; i++) {
+            const sorItem = document.createElement('div');
+            sorItem.className = 'sor-item content-card';
+            sorItem.style.cursor = 'pointer';
+            sorItem.style.padding = '15px';
+            sorItem.style.display = 'flex';
+            sorItem.style.justifyContent = 'space-between';
+            sorItem.style.alignItems = 'center';
+            sorItem.style.border = '1px solid var(--border-color)';
+
+            const sorName = document.createElement('span');
+            sorName.style.fontWeight = 'bold';
+            sorName.textContent = `СОР ${i}`;
+
+            const postCountBadge = document.createElement('span');
+            postCountBadge.className = 'badge';
+            postCountBadge.textContent = '...';
+            postCountBadge.style.backgroundColor = 'var(--text-muted)';
+            postCountBadge.style.color = '#fff';
+            postCountBadge.style.padding = '2px 8px';
+            postCountBadge.style.borderRadius = '12px';
+            postCountBadge.style.fontSize = '0.8em';
+
+            sorItem.appendChild(sorName);
+            sorItem.appendChild(postCountBadge);
+
+            sorItem.addEventListener('click', () => {
+                currentSorContext.sorId = i;
+                renderChatView();
+            });
+            sorsList.appendChild(sorItem);
+
+            // Fetch post count
+            const path = `sorPosts/q${currentSorContext.quarter}/${currentSorContext.subject}/sor${i}`;
+            db.ref(path).on('value', snap => {
+                if (document.body.contains(postCountBadge)) {
+                    const count = snap.exists() ? Object.keys(snap.val()).length : 0;
+                    postCountBadge.textContent = `${count} постов`;
+                    if (count > 0) postCountBadge.style.backgroundColor = 'var(--primary-color)';
+                    else postCountBadge.style.backgroundColor = 'var(--text-muted)';
+                }
+            });
+        }
+        subjectsDiv.appendChild(sorsList);
+    }
+    container.appendChild(subjectsDiv);
+}
+
+function handleBackToSubjectList() {
+    currentSorContext.subject = null;
+    currentSorContext.sorId = null;
+    renderSorNavigation();
+}
+
+function handleBackToSorList() {
+    currentSorContext.sorId = null;
+    renderChatView();
 }
 async function handleProfilePictureUpload(e) {
     const file = e.target.files[0];
@@ -1427,7 +1610,7 @@ async function handleProfilePictureUpload(e) {
     }
     const profilePictureContainer = document.getElementById('profile-picture-container');
     const profilePictureImg = document.getElementById('profile-picture-img');
-    
+
     profilePictureContainer.classList.add('loading');
     try {
         const downloadURL = await uploadToCloudinary(file);
@@ -1512,7 +1695,7 @@ function displayAnnouncement(announcementId, announcementData) {
         // Удаляем обработчик, чтобы избежать дублирования
         closeBtn.removeEventListener('click', closeHandler);
     };
-    
+
     closeBtn.addEventListener('click', closeHandler);
 }
 
@@ -1525,7 +1708,7 @@ function renderAdminPanel() {
 function switchAdminTab(tabName) {
     document.querySelector('.admin-tab.active')?.classList.remove('active');
     document.getElementById(`admin-tab-${tabName}`)?.classList.add('active');
-    
+
     const container = document.getElementById('admin-content-container');
     container.innerHTML = '<p>Загрузка данных...</p>';
 
@@ -1583,7 +1766,7 @@ async function renderAdminUsersTab() {
             // Не админ - только публичные профили через запрос
             const usersRef = db.ref('users');
             const publicUsersSnapshot = await usersRef.orderByChild('profile/isPublic').equalTo(true).once('value');
-            
+
             allUsersDataCache = {};
             if (publicUsersSnapshot.exists()) {
                 publicUsersSnapshot.forEach(childSnapshot => {
@@ -1593,8 +1776,8 @@ async function renderAdminUsersTab() {
         }
 
         if (Object.keys(allUsersDataCache).length === 0) {
-             container.innerHTML = '<p>Не удалось загрузить данные профилей.</p>';
-             return;
+            container.innerHTML = '<p>Не удалось загрузить данные профилей.</p>';
+            return;
         }
 
         // Отключаем предыдущие listeners
@@ -1604,12 +1787,12 @@ async function renderAdminUsersTab() {
             }
         });
         adminUsersListeners = {};
-        
+
         let usersHtml = '';
         for (const uid in allUsersDataCache) {
             const user = allUsersDataCache[uid];
             if (!user.profile) continue;
-            
+
             // Добавляем префиксы в отображение
             const prefixesHtml = generatePrefixesHtml(user.profile.prefixes);
             const lastSeenText = formatLastSeen(user.lastSeen);
@@ -1646,7 +1829,7 @@ async function renderAdminUsersTab() {
                     </div>
                 </div>
             `;
-            
+
             // Устанавливаем listener для отслеживания lastSeen в реальном времени
             const lastSeenRef = db.ref(`users/${uid}/lastSeen`);
             const lastSeenCallback = (snapshot) => {
@@ -1730,7 +1913,7 @@ function renderAdminGradeEditor(uid, button) {
             el.innerHTML = '';
         }
     });
-    document.querySelectorAll('.admin-user-actions .button').forEach(btn => { 
+    document.querySelectorAll('.admin-user-actions .button').forEach(btn => {
         if (btn !== button && btn.textContent === 'Скрыть оценки') {
             btn.textContent = 'Оценки';
         }
@@ -1739,7 +1922,7 @@ function renderAdminGradeEditor(uid, button) {
     if (isHidden) {
         container.classList.remove('hidden');
         button.textContent = 'Скрыть оценки';
-        renderAdminGradeInterface(uid, container); 
+        renderAdminGradeInterface(uid, container);
     } else {
         container.classList.add('hidden');
         container.innerHTML = '';
@@ -1783,7 +1966,7 @@ function renderAdminGradeInterface(uid, container) {
 function renderAdminGradesForQuarter(uid, quarter) {
     const userGrades = allUsersDataCache[uid].grades || {};
     let quarterData = userGrades[`q${quarter}`];
-    
+
     if (!quarterData) {
         quarterData = getNewQuarterData();
         if (!allUsersDataCache[uid].grades) allUsersDataCache[uid].grades = {};
@@ -1798,7 +1981,7 @@ function renderAdminGradesForQuarter(uid, quarter) {
         const p = calculateFinalPercentageForFriend(subjectName, quarterData);
         const g = getGradeFromPercentage(p);
         const row = sidebarBody.querySelector(`tr[data-subject="${subjectName}"]`);
-        if(row) {
+        if (row) {
             row.querySelector('.subject-percentage').textContent = (p !== null && p >= 0) ? p.toFixed(2) + ' %' : '-- %';
             row.querySelector('.subject-grade').textContent = (p !== null && p >= 0) ? g : '-';
         }
@@ -1832,8 +2015,8 @@ function renderAdminGradesForQuarter(uid, quarter) {
 
             contentDisplay.querySelector('.button').addEventListener('click', () => {
                 db.ref(`users/${uid}/grades`).set(allUsersDataCache[uid].grades)
-                  .then(() => alert(`Оценки для ${allUsersDataCache[uid].profile.username} сохранены!`))
-                  .catch(err => alert('Ошибка при сохранении: ' + err.message));
+                    .then(() => alert(`Оценки для ${allUsersDataCache[uid].profile.username} сохранены!`))
+                    .catch(err => alert('Ошибка при сохранении: ' + err.message));
             });
 
             contentDisplay.querySelectorAll('input').forEach(input => {
@@ -1872,7 +2055,7 @@ function renderAdminGradesForQuarter(uid, quarter) {
     });
 
     sidebarBody.querySelectorAll('tr').forEach(row => {
-        row.addEventListener('click', function() {
+        row.addEventListener('click', function () {
             if (sidebarBody.querySelector('.selected')) {
                 sidebarBody.querySelector('.selected').classList.remove('selected');
             }
@@ -1893,8 +2076,8 @@ async function renderAdminPostsTab() {
     container.innerHTML = '<p>Загрузка постов...</p>';
     try {
         if (!allUsersDataCache) {
-             await renderAdminUsersTab();
-             container.innerHTML = '<p>Загрузка постов...</p>';
+            await renderAdminUsersTab();
+            container.innerHTML = '<p>Загрузка постов...</p>';
         }
 
         // Добавляем переключатель категорий
@@ -1923,20 +2106,20 @@ async function renderAdminPostsTab() {
             const authorProfile = allUsersDataCache[post.uid]?.profile;
             const realUsername = authorProfile ? authorProfile.username : 'Неизвестный пользователь';
             const authorPhoto = authorProfile ? authorProfile.photoURL : 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png';
-            
+
             let authorInfo = `<strong>${post.username}</strong>`;
             if (post.isAnonymous) {
                 authorInfo += ` <span class="admin-post-author-reveal">(настоящий автор: ${realUsername})</span>`;
             }
-            
-            const likers = post.likes ? Object.keys(post.likes).map(uid => allUsersDataCache[uid]?.profile?.username || `id:${uid.substring(0,5)}`).join(', ') : 'Никто';
-            const viewers = post.views ? Object.keys(post.views).map(uid => allUsersDataCache[uid]?.profile?.username || `id:${uid.substring(0,5)}`).join(', ') : 'Никто';
-            
+
+            const likers = post.likes ? Object.keys(post.likes).map(uid => allUsersDataCache[uid]?.profile?.username || `id:${uid.substring(0, 5)}`).join(', ') : 'Никто';
+            const viewers = post.views ? Object.keys(post.views).map(uid => allUsersDataCache[uid]?.profile?.username || `id:${uid.substring(0, 5)}`).join(', ') : 'Никто';
+
             let repliesAdminHtml = '';
             if (post.replies) {
                 repliesAdminHtml = '<div class="admin-replies-container">';
                 Object.entries(post.replies).forEach(([replyId, reply]) => {
-                    const replyLikers = reply.likes ? Object.keys(reply.likes).map(uid => allUsersDataCache[uid]?.profile?.username || `id:${uid.substring(0,5)}`).join(', ') : 'Никто';
+                    const replyLikers = reply.likes ? Object.keys(reply.likes).map(uid => allUsersDataCache[uid]?.profile?.username || `id:${uid.substring(0, 5)}`).join(', ') : 'Никто';
                     repliesAdminHtml += `
                         <div class="admin-reply-card" id="admin-reply-${replyId}">
                             <div class="admin-reply-header">
@@ -2018,7 +2201,7 @@ function adminDeleteReply(postId, replyId) {
 // --- НОВЫЕ ФУНКЦИИ ДЛЯ ПРЕФИКСОВ ---
 async function renderAdminPrefixesTab() {
     const container = document.getElementById('admin-content-container');
-    
+
     if (!allUsersDataCache) {
         await renderAdminUsersTab();
         renderAdminPrefixesTab();
@@ -2026,7 +2209,7 @@ async function renderAdminPrefixesTab() {
     }
 
     let userOptions = '<option value="">-- Выберите пользователя --</option>';
-    const sortedUsers = Object.entries(allUsersDataCache).sort((a, b) => 
+    const sortedUsers = Object.entries(allUsersDataCache).sort((a, b) =>
         a[1].profile.username.localeCompare(b[1].profile.username)
     );
 
@@ -2082,7 +2265,7 @@ async function renderAdminPrefixesTab() {
 function displayPrefixesForUser(uid) {
     const listContainer = document.getElementById('admin-current-prefixes-list');
     const form = document.getElementById('admin-add-prefix-form');
-    
+
     if (!uid) {
         listContainer.innerHTML = '<span class="text-muted">Сначала выберите пользователя</span>';
         form.classList.add('hidden');
@@ -2131,15 +2314,15 @@ async function handleAdminPrefixUpload() {
 
     try {
         const imageURL = await uploadToCloudinary(file);
-        
+
         const userPrefixesRef = db.ref(`users/${uid}/profile/prefixes`);
         const snapshot = await userPrefixesRef.once('value');
         const currentPrefixes = snapshot.val() || [];
-        
+
         currentPrefixes.push(imageURL);
-        
+
         await userPrefixesRef.set(currentPrefixes);
-        
+
         // Обновляем кеш
         if (allUsersDataCache[uid] && allUsersDataCache[uid].profile) {
             allUsersDataCache[uid].profile.prefixes = currentPrefixes;
@@ -2163,12 +2346,12 @@ async function adminDeletePrefix(uid, index) {
     if (!confirm(`Вы уверены, что хотите удалить этот префикс?`)) {
         return;
     }
-    
+
     try {
         const userPrefixesRef = db.ref(`users/${uid}/profile/prefixes`);
         const snapshot = await userPrefixesRef.once('value');
         let currentPrefixes = snapshot.val() || [];
-        
+
         if (index >= 0 && index < currentPrefixes.length) {
             currentPrefixes.splice(index, 1);
         }
@@ -2178,7 +2361,7 @@ async function adminDeletePrefix(uid, index) {
         if (allUsersDataCache[uid] && allUsersDataCache[uid].profile) {
             allUsersDataCache[uid].profile.prefixes = currentPrefixes;
         }
-        
+
         alert('Префикс удален.');
         displayPrefixesForUser(uid);
 
@@ -2192,19 +2375,19 @@ async function adminDeletePrefix(uid, index) {
 // НОВЫЕ ФУНКЦИИ ДЛЯ ВКЛАДКИ СООБЩЕНИЙ В АДМИН-ПАНЕЛИ
 async function renderAdminMessagesTab() {
     const container = document.getElementById('admin-content-container');
-    
+
     // Убедимся, что кеш пользователей загружен
     if (!allUsersDataCache) {
         await renderAdminUsersTab();
         // После загрузки renderAdminUsersTab уже отрисует свой контент,
         // поэтому нам нужно снова вызвать эту функцию, чтобы отрисовать вкладку сообщений
-        renderAdminMessagesTab(); 
+        renderAdminMessagesTab();
         return;
     }
 
     let userOptions = '<option value="all">Всем пользователям</option>';
-    if(allUsersDataCache) {
-        for(const uid in allUsersDataCache) {
+    if (allUsersDataCache) {
+        for (const uid in allUsersDataCache) {
             const username = allUsersDataCache[uid]?.profile?.username;
             if (username) {
                 userOptions += `<option value="${username}">${username}</option>`;
@@ -2285,35 +2468,35 @@ async function searchUserForCompare(username) {
         resultsContainer.innerHTML = '<p class="no-data-message">Введите имя пользователя.</p>';
         return;
     }
-    
+
     resultsContainer.innerHTML = '<p class="no-data-message">Поиск...</p>';
-    
+
     try {
         const usernameSnapshot = await db.ref(`usernames/${username.toLowerCase()}`).once('value');
         if (!usernameSnapshot.exists()) {
             resultsContainer.innerHTML = '<p class="no-data-message">Пользователь не найден.</p>';
             return;
         }
-        
+
         const uid = usernameSnapshot.val();
         const userSnapshot = await db.ref(`users/${uid}`).once('value');
         if (!userSnapshot.exists()) {
             resultsContainer.innerHTML = '<p class="no-data-message">Пользователь не найден.</p>';
             return;
         }
-        
+
         const userData = userSnapshot.val();
         if (!userData || !userData.profile) {
             resultsContainer.innerHTML = '<p class="no-data-message">Данные пользователя не найдены.</p>';
             return;
         }
-        
+
         // Проверяем приватность (для сравнения можно сравнивать только публичные профили или свой)
         if (!userData.profile.isPublic && uid !== currentUser.uid) {
             resultsContainer.innerHTML = '<p class="no-data-message">Этот аккаунт приватный. Вы не можете сравнивать с ним.</p>';
             return;
         }
-        
+
         // Показываем найденного пользователя
         const prefixesHtml = generatePrefixesHtml(userData.profile.prefixes || []);
         resultsContainer.innerHTML = `
@@ -2337,7 +2520,7 @@ async function searchUserForCompare(username) {
 async function selectCompareUser(uid2) {
     // Закрываем модальное окно
     document.getElementById('compare-modal-overlay').classList.add('hidden');
-    
+
     try {
         // Загружаем данные первого пользователя
         const user1Snapshot = await db.ref(`users/${compareUser1Uid}`).once('value');
@@ -2346,7 +2529,7 @@ async function selectCompareUser(uid2) {
             return;
         }
         const user1Data = { uid: compareUser1Uid, ...user1Snapshot.val() };
-        
+
         // Загружаем данные второго пользователя
         let user2Data;
         if (uid2 === 'self') {
@@ -2369,13 +2552,13 @@ async function selectCompareUser(uid2) {
             }
             user2Data = { uid: uid2, ...user2Snapshot.val() };
         }
-        
+
         // Сохраняем данные для использования в renderCompareView
         window.compareData = { user1: user1Data, user2: user2Data };
-        
+
         // Переключаемся на вкладку сравнения
         navigateTo('compare');
-        
+
         // Отображаем сравнение
         renderCompareView(user1Data, user2Data, 1);
     } catch (error) {
@@ -2390,17 +2573,17 @@ function renderCompareView(user1Data, user2Data, quarter) {
     const user2Profile = user2Data.profile;
     const user1Grades = user1Data.grades || {};
     const user2Grades = user2Data.grades || {};
-    
+
     const quarterData1 = user1Grades[`q${quarter}`] || getNewQuarterData();
     const quarterData2 = user2Grades[`q${quarter}`] || getNewQuarterData();
-    
+
     // Статистика для обоих пользователей
     const stats1 = calculateCompareStats(quarterData1);
     const stats2 = calculateCompareStats(quarterData2);
-    
+
     const prefixes1Html = generatePrefixesHtml(user1Profile.prefixes || []);
     const prefixes2Html = generatePrefixesHtml(user2Profile.prefixes || []);
-    
+
     let compareHtml = `
         <div class="compare-profiles-grid">
             <div class="compare-profile-column">
@@ -2484,23 +2667,23 @@ function renderCompareView(user1Data, user2Data, quarter) {
             </div>
         </div>
     `;
-    
+
     container.innerHTML = compareHtml;
-    
+
     // Заполняем таблицы оценок
     const tbody1 = document.getElementById('compare-grades-user1');
     const tbody2 = document.getElementById('compare-grades-user2');
-    
+
     const subjects1 = Object.keys(quarterData1.section || {});
     const subjects2 = Object.keys(quarterData2.section || {});
     const allSubjects = [...new Set([...subjects1, ...subjects2])];
-    
+
     allSubjects.forEach(subject => {
         const p1 = calculateFinalPercentageForFriend(subject, quarterData1);
         const g1 = getGradeFromPercentage(p1);
         const p2 = calculateFinalPercentageForFriend(subject, quarterData2);
         const g2 = getGradeFromPercentage(p2);
-        
+
         const row1 = document.createElement('tr');
         row1.innerHTML = `
             <td>${subject}</td>
@@ -2508,7 +2691,7 @@ function renderCompareView(user1Data, user2Data, quarter) {
             <td class="subject-grade">${(p1 !== null && p1 >= 0) ? g1 : '-'}</td>
         `;
         tbody1.appendChild(row1);
-        
+
         const row2 = document.createElement('tr');
         row2.innerHTML = `
             <td>${subject}</td>
@@ -2614,7 +2797,7 @@ async function openImageModalFromElement(imgEl) {
     const modalImg = document.getElementById('image-modal-img');
     if (!overlay || !modalImg) return;
     // lock body scroll so the source doesn't move while modal is open
-    try { document.body.style.overflow = 'hidden'; } catch (e) {}
+    try { document.body.style.overflow = 'hidden'; } catch (e) { }
     overlay.classList.remove('hidden');
     overlay.style.opacity = '0';
     // trigger fade in of overlay
@@ -2714,7 +2897,7 @@ function closeImageModalToSource() {
         modalImg.style.visibility = 'hidden';
         currentImageSourceEl = null;
         // restore body scroll
-        try { document.body.style.overflow = ''; } catch (e) {}
+        try { document.body.style.overflow = ''; } catch (e) { }
     };
 
     clone.addEventListener('transitionend', cleanup);
@@ -2759,18 +2942,18 @@ function calculateCompareStats(quarterData) {
             }
         });
     }
-    
+
     if (subjectPerformances.length === 0) {
         return { averagePercentage: 0, averageGrade: 0, bestSubject: null, worstSubject: null };
     }
-    
+
     const totalGrade = subjectPerformances.reduce((sum, p) => sum + p.grade, 0);
     const totalPercentage = subjectPerformances.reduce((sum, p) => sum + p.percentage, 0);
     const averageGrade = totalGrade / subjectPerformances.length;
     const averagePercentage = totalPercentage / subjectPerformances.length;
     const bestSubject = subjectPerformances.reduce((best, current) => current.percentage > best.percentage ? current : best, subjectPerformances[0]);
     const worstSubject = subjectPerformances.reduce((worst, current) => current.percentage < worst.percentage ? current : worst, subjectPerformances[0]);
-    
+
     return {
         averagePercentage: averagePercentage,
         averageGrade: averageGrade,
