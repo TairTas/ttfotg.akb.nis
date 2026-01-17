@@ -9,6 +9,10 @@
     --shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
 }
 
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     font-size: 16px;
@@ -967,16 +971,6 @@ input:checked+.slider:before {
 
 #image-modal {
     position: relative;
-    max-width: 95%;
-    max-height: 95%;
-}
-
-#image-modal-img {
-    display: block;
-    max-width: 100%;
-    max-height: 100%;
-    border-radius: 8px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
 #image-modal-close {
@@ -1482,30 +1476,39 @@ input:checked+.slider:before {
     border-radius: 18px;
 }
 
-/* --- СТИЛИ ДЛЯ ПРОСМОТРОВ И УЛУЧШЕНИЯ ОТВЕТОВ --- */
+/* --- СТИЛИ ДЛЯ ВЗАИМОДЕЙСТВИЯ (ЛАЙКИ, ОТВЕТЫ, ПРОСМОТРЫ) --- */
 .action-btn {
     display: flex;
     align-items: center;
-    gap: 5px;
-    background: none;
-    border: none;
+    justify-content: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid transparent;
     cursor: pointer;
     color: var(--text-muted);
-    font-size: 14px;
-    padding: 5px 8px;
-    border-radius: 6px;
-    transition: background-color 0.2s, color 0.2s;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 20px;
+    transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+    background: rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
 }
 
 .action-btn svg {
+    /* Explicitly set sizing in case inline width/height are missing */
     width: 20px;
     height: 20px;
     fill: currentColor;
+    flex-shrink: 0;
 }
 
 .like-btn:hover {
-    background-color: #fce4e4;
-    color: #c93636;
+    background-color: #ffebee;
+    color: #e53935;
 }
 
 .like-btn.liked {
@@ -1993,4 +1996,226 @@ input:checked+.slider:before {
     /* Hanging curve */
     z-index: -1;
     background: transparent;
+}
+
+/* --- Mobile Navigation & Responsive Tweaks --- */
+
+/* Default Desktop State for Icons */
+.nav-icon {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+    vertical-align: text-bottom;
+    fill: currentColor;
+    opacity: 0.8;
+}
+
+/* Ensure buttons render correctly with flex */
+.main-nav-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 768px) {
+    /* Global Mobile Fixes */
+    html, body {
+        width: 100%;
+        overflow-x: hidden;
+    }
+
+    /* Fixed Bottom Navigation */
+    .main-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        height: 60px;
+        height: calc(60px + env(safe-area-inset-bottom));
+        padding-bottom: env(safe-area-inset-bottom);
+        background-color: var(--card-background);
+        border-top: 1px solid var(--border-color);
+        z-index: 10000;
+        margin: 0;
+        padding-left: 0;
+        padding-right: 0;
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+        gap: 0;
+    }
+
+    .main-nav-btn {
+        flex: 1;
+        height: 100%;
+        border: none;
+        border-radius: 0;
+        padding: 0;
+        flex-direction: column;
+        justify-content: center;
+        background-color: transparent;
+        color: var(--text-muted);
+        border-top: 3px solid transparent; 
+        min-height: 48px;
+    }
+
+    .main-nav-btn.active {
+        color: var(--primary-color);
+        background-color: transparent;
+        border-top-color: var(--primary-color);
+        font-weight: normal; 
+    }
+
+    .main-nav-btn span { display: none; }
+
+    .nav-icon {
+        display: block;
+        margin: 0;
+        width: 24px;
+        height: 24px;
+        margin-bottom: 2px;
+        opacity: 1;
+    }
+
+    /* Layout & Spacing */
+    #app-container {
+        padding: 0 12px;
+        padding-bottom: 100px;
+        width: 100%;
+        max-width: 100vw;
+        box-sizing: border-box;
+        overflow-x: hidden;
+    }
+
+    #app-header {
+        padding: 10px 12px;
+        justify-content: space-between;
+    }
+
+    .content-card {
+        padding: 15px 12px;
+        margin-bottom: 15px;
+        width: 100%; /* Ensure it doesn't exceed container */
+        box-sizing: border-box;
+        overflow: hidden; /* Prevent child content from stretching card */
+    }
+    
+    #app-container > .content-card {
+        margin: 10px 0;
+        width: 100%;
+    }
+
+    /* Typography & Scale */
+    h2 { font-size: 1.3em; }
+    h3 { font-size: 1.2em; }
+    h4 { font-size: 1em; } /* Further reduced */
+    
+    /* Stats Specifics */
+    .gauge-container {
+        width: 140px;
+        height: 70px;
+        margin: 10px auto;
+    }
+    
+    .gauge-text { font-size: 1.8em; }
+    
+    .stats-details { 
+        padding-top: 10px;
+        width: 100%;
+        /* Reduce overall scale of stats details details */
+        font-size: 0.9em; 
+    }
+
+    .stat-item {
+        font-size: 0.8em; /* Even smaller */
+        flex-wrap: nowrap; /* Prevent wrapping if possible to keep lines clean, rely on ellipsis */
+        gap: 10px;
+        align-items: center;
+    }
+    
+    .stat-item strong {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    
+    .stat-item span {
+        text-align: right;
+        flex-grow: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.95em;
+    }
+
+    /* Charts & Tables - Reduce scale */
+    .charts-section {
+        font-size: 0.85em; /* Reduce text size inside chart area wrapper */
+    }
+
+    .charts-section canvas {
+        max-height: 800px; /* Increased height for visibility */
+        max-width: 100% !important; 
+        width: 100% !important; 
+    }
+    
+    .table-wrapper, .sidebar.table-wrapper {
+        width: 100%;
+        overflow-x: auto;
+        display: block;
+        margin: 0;
+        font-size: 0.8em; 
+    }
+    
+    table { 
+        width: 100%; 
+        min-width: 600px; /* Force horizontal scroll to prevent text crushing */
+        table-layout: auto;
+    }
+    
+    table { width: 100%; min-width: 300px; }
+
+    /* Profile Adjustments */
+    .profile-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .profile-actions { display: flex; justify-content: center; gap: 15px; margin-top: 15px; }
+    
+    #profile-info-display { margin: 10px 0 0 0; }
+}
+/* --- Edit Grades Table Improvements --- */
+.edit-grades-table .task-name-input {
+    width: 100% !important;
+    min-width: 120px;
+    text-align: left !important;
+    max-width: none !important;
+}
+
+/* Tighter spacing for Result and Max columns */
+.edit-grades-table th:nth-child(3),
+.edit-grades-table td:nth-child(3) {
+    padding-right: 2px !important;
+    padding-left: 2px !important;
+    text-align: center;
+}
+
+.edit-grades-table th:nth-child(4),
+.edit-grades-table td:nth-child(4) {
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+    text-align: center;
+}
+
+/* Ensure inputs in these columns are compact and centered */
+.edit-grades-table td:nth-child(3) input,
+.edit-grades-table td:nth-child(4) input {
+    width: 55px !important; /* Fixed compact width */
+    padding: 6px 2px !important; /* Smaller horizontal padding */
+    margin: 0 auto;
+    display: block;
 }
