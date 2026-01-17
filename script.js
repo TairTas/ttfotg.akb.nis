@@ -58,9 +58,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const removePostImageButton = document.getElementById('remove-post-image-btn');
     const leaderboardFilter = document.getElementById('leaderboard-filter-complete');
 
+    // Main Profile Tabs Switching
+    document.querySelectorAll('.main-profile-tabs .tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+             document.querySelectorAll('.main-profile-tabs .tab').forEach(t => t.classList.remove('active'));
+             tab.classList.add('active');
+             const view = tab.dataset.view;
+             if(view === 'grades') {
+                 document.getElementById('main-profile-view-grades').classList.remove('hidden');
+                 document.getElementById('main-profile-view-stats').classList.add('hidden');
+             } else {
+                 document.getElementById('main-profile-view-grades').classList.add('hidden');
+                 document.getElementById('main-profile-view-stats').classList.remove('hidden');
+                 // Re-render dashboard to ensure charts scale correctly
+                 renderProfileDashboard();
+             }
+        });
+    });
+
     // Initialize New Year Decorations
-    initSnow();
-    initGarland();
+    // initSnow();
+    // initGarland();
 
     auth.onAuthStateChanged(async (user) => {
         const userDisplayNameElement = document.getElementById('user-display-name');
@@ -134,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const views = { profile: document.getElementById('profile-view'), grades: document.getElementById('grades-view'), stats: document.getElementById('stats-view'), users: document.getElementById('users-view'), leaderboard: document.getElementById('leaderboard-view'), chat: document.getElementById('chat-view'), admin: document.getElementById('admin-panel-view') };
     const navButtons = { profile: document.getElementById('nav-profile'), grades: document.getElementById('nav-grades'), stats: document.getElementById('nav-stats'), users: document.getElementById('nav-users'), leaderboard: document.getElementById('nav-leaderboard'), chat: document.getElementById('nav-chat'), admin: document.getElementById('nav-admin') };
-    Object.keys(navButtons).forEach(key => navButtons[key].addEventListener('click', (e) => { navigateTo(key); moveNavIndicatorTo(e.currentTarget); }));
+    Object.keys(navButtons).forEach(key => navButtons[key].addEventListener('click', (e) => { navigateTo(key); }));
 
     document.getElementById('privacy-checkbox').addEventListener('change', (e) => savePrivacySetting(e.target.checked));
     document.getElementById('profile-settings-btn').addEventListener('click', () => { document.getElementById('profile-settings-panel').classList.toggle('hidden'); });
@@ -221,8 +239,19 @@ document.addEventListener('DOMContentLoaded', () => {
             e.target.classList.add('active');
             currentQuarter = parseInt(e.target.dataset.quarter, 10);
             if (!allGradesData[`q${currentQuarter}`]) {
-                allGradesData[`q${currentQuarter}`] = getNewQuarterData();
+                allGradesData[`q${currentQuarter}`] = getNewQuarterData(currentQuarter);
                 saveData();
+            } else if (currentQuarter === 2) {
+                // Check for outdated Q2 data on switch
+                let needsUpdate = false;
+                if (allGradesData['q2'].section['Биология'] && allGradesData['q2'].section['Биология'].some(t => t.name.includes("7.1A"))) needsUpdate = true;
+                if (!needsUpdate && allGradesData['q2'].section['География'] && allGradesData['q2'].section['География'].some(t => t.name.includes("Географиялык"))) needsUpdate = true;
+
+                if (needsUpdate) {
+                    console.log("Auto-updating outdated Q2 data...");
+                    allGradesData['q2'] = getNewQuarterData(2);
+                    saveData();
+                }
             }
             renderApp();
         }
@@ -361,10 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     // Initialize image modal handlers now that DOM is ready
     setupImageModalHandlers();
-    // Initialize nav indicator
-    setupNavIndicator();
-    // Reposition indicator on window resize
-    window.addEventListener('resize', () => { const active = document.querySelector('.main-nav-btn.active'); if (active) positionIndicatorToElement(active, true); });
+
 });
 
 // --- КОД ФУНКЦИЙ ---
@@ -377,10 +403,133 @@ function generatePrefixesHtml(prefixes) {
     return prefixes.map(url => `<img src="${url}" class="nickname-prefix" alt="prefix">`).join('');
 }
 
-function getNewQuarterData() {
+function getNewQuarterData(quarter) {
+    if (quarter === 2) {
+        return JSON.parse(JSON.stringify({
+            "section": { "Английский язык": [{ name: "Listening", max: 5, userResult: "" }, { name: "Reading", max: 7, userResult: "" }, { name: "Writing", max: 6, userResult: "" }, { name: "Speaking", max: 5, userResult: "" }], "Биология": [{ name: "7.2А Питание", max: 12, userResult: "" }, { name: "7.2В Транспорт у растений", max: 15, userResult: "" }, { name: "7.2С Дыхание", max: 10, userResult: "" }, { name: "7.2D Выделение", max: 5, userResult: "" }], "Всемирная история": [{ name: "Раздел 7.2А Крестовые походы", max: 5, userResult: "" }, { name: "Раздел 7.2В Монголы", max: 8, userResult: "" }, { name: "Раздел 7.2С Средневековоее европейское об ...", max: 14, userResult: "" }], "География": [{ name: "7.2А Физикалык география. Атмосфера", max: 12, userResult: "" }, { name: "7.2В Физикалык география. Гидросфера", max: 13, userResult: "" }], "Информатика": [{ name: "7.2А Электронные таблицы", max: 14, userResult: "" }, { name: "7.2В Табличная модель", max: 12, userResult: "" }], "Искусство": [{ name: "Раздел 2. Роботы", max: 10, userResult: "" }, { name: "Раздел 2А Музыка и цифровые медиатехнол ...", max: 6, userResult: "" }], "История Казахстана": [{ name: "X ғасыр - XIII ғасырдың басындағы Қазақстан", max: 13, userResult: "" }, { name: "XIII ғасыр - XV ғасырдың бірінші жартысын ...", max: 11, userResult: "" }], "Казахский язык и литература": [{ name: "Тыңдалым", max: 10, userResult: "" }, { name: "Айтылым", max: 10, userResult: "" }, { name: "Оқылым", max: 9, userResult: "" }, { name: "Жазылым", max: 8, userResult: "" }], "Математика": [{ name: "7.2А Линейные уравнение и неравенства, со ...", max: 18, userResult: "" }, { name: "7.2В Многочлены", max: 20, userResult: "" }, { name: "7.2С Элементы статистики", max: 17, userResult: "" }], "Русский язык и литература": [{ name: "слушание и говорение", max: 10, userResult: "" }, { name: "письмо.", max: 10, userResult: "" }, { name: "чтение.", max: 15, userResult: "" }], "Физика": [{ name: "7.2А Плотность", max: 16, userResult: "" }, { name: "Взаимодействие сил", max: 16, userResult: "" }], "Физическая культура": [{ name: "Раздел 3 - Гимнастика", max: 10, userResult: "" }, { name: "Раздел 4 - Казахские национальные игры", max: 10, userResult: "" }], "Химия": [{ name: "7.2А Реакция горения", max: 20, userResult: "" }, { name: "Классификация химических реакций", max: 20, userResult: "" }] },
+            "quarter": {
+                "Английский язык": [
+                    { name: "Listening", max: 6, userResult: "" },
+                    { name: "Reading", max: 6, userResult: "" },
+                    { name: "Writing", max: 6, userResult: "" },
+                    { name: "Speaking", max: 6, userResult: "" }
+                ],
+                "Биология": [
+                    { name: "7.2А Питание", max: 7, userResult: "" },
+                    { name: "7.2В Транспорт у растений", max: 11, userResult: "" },
+                    { name: "7.2С Дыхание", max: 7, userResult: "" },
+                    { name: "7.2D Выделение", max: 5, userResult: "" }
+                ],
+                "Всемирная история": [
+                    { name: "Раздел 7.2А Крестовые походы", max: 8, userResult: "" },
+                    { name: "Раздел 7.2В Монголы", max: 4, userResult: "" },
+                    { name: "Раздел 7.2С Средневековоее европейское об ...", max: 13, userResult: "" }
+                ],
+                "География": [
+                    { name: "7.2А Физикалык география. Атмосфера", max: 11, userResult: "" },
+                    { name: "7.2В Физикалык география. Гидросфера", max: 14, userResult: "" }
+                ],
+                "Информатика": [
+                    { name: "7.2А Электронные таблицы", max: 15, userResult: "" },
+                    { name: "7.2В Табличная модель", max: 5, userResult: "" }
+                ],
+                "Искусство": [
+                    { name: "Раздел 2. Роботы", max: 15, userResult: "" },
+                    { name: "Раздел 2А Музыка и цифровые медиатехнол ...", max: 15, userResult: "" }
+                ],
+                "История Казахстана": [
+                    { name: "X ғасыр - XIII ғасырдың басындағы Қазақстан", max: 17, userResult: "" },
+                    { name: "XIII ғасыр - XV ғасырдың бірінші жартысын ...", max: 8, userResult: "" }
+                ],
+                "Казахский язык и литература": [
+                    { name: "Тыңдалым", max: 10, userResult: "" },
+                    { name: "Айтылым", max: 10, userResult: "" },
+                    { name: "Оқылым", max: 10, userResult: "" },
+                    { name: "Жазылым", max: 10, userResult: "" }
+                ],
+                "Математика": [
+                    { name: "7.2А Линейные уравнение и неравенства, со ...", max: 11, userResult: "" },
+                    { name: "7.2В Многочлены", max: 10, userResult: "" },
+                    { name: "7.2С Элементы статистики", max: 9, userResult: "" }
+                ],
+                "Русский язык и литература": [
+                    { name: "слушание и говорение", max: 10, userResult: "" },
+                    { name: "письмо.", max: 10, userResult: "" },
+                    { name: "чтение.", max: 10, userResult: "" }
+                ],
+                "Физика": [
+                    { name: "7.2А Плотность", max: 12, userResult: "" },
+                    { name: "Взаимодействие сил", max: 18, userResult: "" }
+                ],
+                "Физическая культура": [],
+                "Химия": [
+                    { name: "7.2А Реакция горения", max: 12, userResult: "" },
+                    { name: "Классификация химических реакций", max: 18, userResult: "" }
+                ]
+            }
+        }));
+    }
     return JSON.parse(JSON.stringify({
         "section": { "Английский язык": [{ name: "Listening", max: 5, userResult: "" }, { name: "Reading", max: 6, userResult: "" }, { name: "Writing", max: 7, userResult: "" }, { name: "Speaking", max: 6, userResult: "" }], "Биология": [{ name: "7.1A Разнообразие живых организмов", max: 18, userResult: "" }, { name: "7.1B Клеточная биология", max: 13, userResult: "" }, { name: "7.1C Вода и органические вещества", max: 12, userResult: "" }], "Всемирная история": [{ name: "Раздел 7.1A Падение Римской империи", max: 12, userResult: "" }, { name: "Раздел 7.1B Феодализм", max: 3, userResult: "" }, { name: "Раздел 7.1C История ислама", max: 15, userResult: "" }], "География": [{ name: "Географиялық зерттеу әдістері", max: 7, userResult: "" }, { name: "Картография және географиялық деректер ...", max: 10, userResult: "" }, { name: "Физикалық география \"Литосфера\"", max: 14, userResult: "" }], "Информатика": [{ name: "7.1A Социальная безопасность", max: 14, userResult: "" }, { name: "Раздел 7.1B - Аппаратное и программное об...", max: 12, userResult: "" }], "Искусство": [{ name: "Раздел 1. Портрет", max: 10, userResult: "" }, { name: "Раздел 1. Музыкальная грамотность", max: 5, userResult: "" }], "История Казахстана": [{ name: "Бөлім 7.1A VI – IX ғғ. Қазақстан", max: 14, userResult: "" }], "Казахский язык и литература": [{ name: "Тыңдалым", max: 10, userResult: "" }, { name: "Айтылым", max: 10, userResult: "" }, { name: "Оқылым", max: 20, userResult: "" }, { name: "Жазылым", max: 10, userResult: "" }], "Математика": [{ name: "7.1A Начальные геометрические сведения", max: 13, userResult: "" }, { name: "7.1B Математическое моделирование тексто...", max: 13, userResult: "" }, { name: "7.1C Степень с целым показателем", max: 16, userResult: "" }], "Русский язык и литература": [{ name: "слушание и говорение", max: 7, userResult: "" }, { name: "письмо.", max: 10, userResult: "" }, { name: "чтение.", max: 10, userResult: "" }], "Физика": [{ name: "7.1A Физические величины и измерения", max: 16, userResult: "" }, { name: "Движение", max: 16, userResult: "" }], "Физическая культура": [{ name: "Раздел 1 - Легкая атлетика", max: 10, userResult: "" }, { name: "Раздел 2 - Взаимодействие в командных сп...", max: 10, userResult: "" }], "Химия": [{ name: "7.1A Введение в химию. Элементы, соедине...", max: 18, userResult: "" }, { name: "7.1B Изменения агрегатного состояния веще...", max: 22, userResult: "" }] },
-        "quarter": { "Английский язык": [{ name: "Listening", max: 6, userResult: "" }, { name: "Reading", max: 6, userResult: "" }, { name: "Writing", max: 6, userResult: "" }, { name: "Speaking", max: 6, userResult: "" }], "Биология": [{ name: "7.1A Разнообразие живых организмов", max: 8, userResult: "" }, { name: "7.1B Клеточная биология", max: 10, userResult: "" }, { name: "7.1C Вода и органические вещества", max: 12, userResult: "" }], "Всемирная история": [{ name: "Раздел 7.1A Падение Римской империи", max: 9, userResult: "" }, { name: "Раздел 7.1B Феодализм", max: 10, userResult: "" }, { name: "Раздел 7.1C История ислама", max: 6, userResult: "" }], "География": [{ name: "Географиялық зерттеу әдістері", max: 4, userResult: "" }, { name: "Картография және географиялық деректер ...", max: 11, userResult: "" }, { name: "Физикалық география \"Литосфера\"", max: 10, userResult: "" }], "Информатика": [{ name: "7.1A Социальная безопасность", max: 4, userResult: "" }, { name: "Раздел 7.1B - Аппаратное и программное об...", max: 16, userResult: "" }], "Искусство": [{ name: "Раздел 1. Портрет", max: 15, userResult: "" }, { name: "Раздел 1. Музыкальная грамотность", max: 15, userResult: "" }], "История Казахстана": [{ name: "Бөлім 7.1A VI – IX ғғ. Қазақстан", max: 25, userResult: "" }], "Казахский язык и литература": [{ name: "Тыңдалым", max: 10, userResult: "" }, { name: "Айтылым", max: 10, userResult: "" }, { name: "Оқылым", max: 10, userResult: "" }, { name: "Жазылым", max: 10, userResult: "" }], "Математика": [{ name: "7.1A Начальные геометрические сведения", max: 7, userResult: "" }, { name: "7.1B Математическое моделирование тексто...", max: 6, userResult: "" }, { name: "7.1C Степень с целым показателем", max: 17, userResult: "" }], "Русский язык и литература": [{ name: "слушание и говорение", max: 10, userResult: "" }, { name: "письмо.", max: 10, userResult: "" }, { name: "чтение.", max: 10, userResult: "" }], "Физика": [{ name: "7.1A Физические величины и измерения", max: 12, userResult: "" }, { name: "Движение", max: 18, userResult: "" }], "Физическая культура": [], "Химия": [{ name: "7.1A Введение в химию. Элементы, соедине...", max: 16, userResult: "" }, { name: "7.1B Изменения агрегатного состояния веще...", max: 14, userResult: "" }] }
+        "quarter": {
+            "Английский язык": [
+                { name: "СОР 2 (Listening)", max: 8, userResult: "" },
+                { name: "СОР 3 (Reading)", max: 8, userResult: "" },
+                { name: "СОР 4 (Writing)", max: 8, userResult: "" },
+                { name: "СОЧ 2 (Speaking)", max: 16, userResult: "" }
+            ],
+            "Биология": [
+                { name: "СОР 2 (Генетика)", max: 10, userResult: "" },
+                { name: "СОР 3 (Анатомия)", max: 10, userResult: "" },
+                { name: "СОЧ 2 (Экология)", max: 20, userResult: "" }
+            ],
+            "Всемирная история": [
+                { name: "СОР 2 (Средневековье)", max: 12, userResult: "" },
+                { name: "СОЧ 2 (Крестовые походы)", max: 18, userResult: "" }
+            ],
+            "География": [
+                { name: "СОР 2 (Климат)", max: 12, userResult: "" },
+                { name: "СОЧ 2 (Гидросфера)", max: 18, userResult: "" }
+            ],
+            "Информатика": [
+                { name: "СОР 2 (Алгоритмы)", max: 10, userResult: "" },
+                { name: "СОЧ 2 (Программирование)", max: 20, userResult: "" }
+            ],
+            "Искусство": [
+                { name: "СОР 2 (Живопись)", max: 10, userResult: "" },
+                { name: "СОЧ 2 (Музыка)", max: 10, userResult: "" }
+            ],
+            "История Казахстана": [
+                { name: "СОР 2 (X – XIII ғғ.)", max: 10, userResult: "" },
+                { name: "СОЧ 2 (Казахстан)", max: 20, userResult: "" }
+            ],
+            "Казахский язык и литература": [
+                { name: "СОР 2 (Тыңдалым)", max: 12, userResult: "" },
+                { name: "СОР 3 (Айтылым)", max: 12, userResult: "" },
+                { name: "СОЧ 2 (Оқылым)", max: 24, userResult: "" }
+            ],
+            "Математика": [
+                { name: "СОР 2 (Алгебра)", max: 12, userResult: "" },
+                { name: "СОР 3 (Геометрия)", max: 12, userResult: "" },
+                { name: "СОЧ 2 (Функции)", max: 24, userResult: "" }
+            ],
+            "Русский язык и литература": [
+                { name: "СОР 2 (Чтение)", max: 12, userResult: "" },
+                { name: "СОЧ 2 (Письмо)", max: 18, userResult: "" }
+            ],
+            "Физика": [
+                { name: "СОР 2 (Механика)", max: 15, userResult: "" },
+                { name: "СОЧ 2 (Тепловые явления)", max: 20, userResult: "" }
+            ],
+            "Физическая культура": [
+                { name: "СОР 2 (Зимние виды спорта)", max: 10, userResult: "" },
+                { name: "СОЧ 2 (Гимнастика)", max: 10, userResult: "" }
+            ],
+            "Химия": [
+                { name: "СОР 2 (Химические реакции)", max: 15, userResult: "" },
+                { name: "СОЧ 2 (Кислоты и основания)", max: 20, userResult: "" }
+            ]
+        }
     }));
 }
 function getFriendlyAuthError(errorCode) {
@@ -441,7 +590,36 @@ function loadUserData() {
                 } else {
                     adminNavButton.classList.add('hidden');
                 }
-                if (!allGradesData[`q${currentQuarter}`]) { allGradesData[`q${currentQuarter}`] = getNewQuarterData(); }
+                if (!allGradesData[`q${currentQuarter}`]) { allGradesData[`q${currentQuarter}`] = getNewQuarterData(currentQuarter); }
+                
+                // --- FIX FOR OUTDATED Q2 DATA START ---
+                // Check if Q2 data exists but looks like Q1 data (using "Biology: 7.1A" presence as a heuristic)
+                if (currentQuarter === 2 && allGradesData['q2'] && allGradesData['q2'].section && allGradesData['q2'].section['Биология']) {
+                     const bioTopics = allGradesData['q2'].section['Биология'];
+                     const isOldData = bioTopics.some(t => t.name.includes("7.1A"));
+                     if (isOldData) {
+                         console.log("Detected outdated Q2 data. Updating to new structure...");
+                         // Replace q2 with new structure
+                         // We could try to migrate scores but since topic names changed drastically (7.1 vs 7.2), it's safer to reset structure
+                         // or we can try to map by index if the user wants to keep attempts, but they said "all is correct in Q1, change Q2".
+                         // Usually safe to just overwrite the structure slots.
+                         allGradesData['q2'] = getNewQuarterData(2);
+                         saveData();
+                     }
+                }
+                // Also check Geography specifically since user showed screenshot of old geo
+                if (currentQuarter === 2 && allGradesData['q2'] && allGradesData['q2'].section && allGradesData['q2'].section['География']) {
+                    const geoTopics = allGradesData['q2'].section['География'];
+                    // "Географиялык зерттеу әдістері" is Q1 topic.
+                    const isOldGeo = geoTopics.some(t => t.name.includes("Географиялык")); 
+                    if (isOldGeo) {
+                        console.log("Detected outdated Q2 Geography data. Updating...");
+                        allGradesData['q2'] = getNewQuarterData(2);
+                        saveData();
+                    }
+                }
+                // --- FIX END ---
+
                 renderApp();
                 renderProfileDashboard();
                 checkForAnnouncements(); // Проверяем сообщения после загрузки
@@ -481,45 +659,324 @@ function renderStatisticsView(containerId, gradesData, isFriend = false) {
     const activeQBtn = document.querySelector(`${quarterSelectorId} .q-btn.active`);
     if (activeQBtn) { statsQuarter = activeQBtn.dataset.quarter; }
 
-    const quarterData = gradesData[`q${statsQuarter}`];
+    // --- Prepare Data for Charts (Year Overview) ---
+    const qLabels = ['1 Четверть', '2 Четверть', '3 Четверть', '4 Четверть'];
+    const avgPerQuarter = [];
+    const subjectsMap = {}; // { subjectName: [q1%, q2%, q3%, q4%] }
 
-    container.innerHTML = `<div class="gauge-container"><svg viewBox="0 0 100 50" class="gauge"><path class="gauge-bg" d="M 10 50 A 40 40 0 0 1 90 50"></path><path class="gauge-fg" d="M 10 50 A 40 40 0 0 1 90 50"></path></svg><div class="gauge-text">--</div><div class="gauge-min-max"><span>2</span><span>5</span></div></div><div class="stats-avg-grade-text"></div><div class="stats-details"><div class="stat-item"><strong>Средний %:</strong><span>--</span></div><div class="stat-item"><strong>Лучший предмет:</strong><span>--</span></div><div class="stat-item"><strong>Худший предмет:</strong><span>--</span></div></div>`;
-
-    if (!quarterData) {
-        container.querySelector('.stats-avg-grade-text').textContent = 'Нет данных для этой четверти.';
-        return;
-    }
-    let subjectPerformances = [];
-    Object.keys(quarterData.section).forEach(subject => {
-        const percentage = calculateFinalPercentageForFriend(subject, quarterData);
-        if (percentage !== null && percentage >= 0) {
-            subjectPerformances.push({ name: subject, percentage: percentage, grade: getGradeFromPercentage(percentage) });
+    for (let q = 1; q <= 4; q++) {
+        const qData = gradesData[`q${q}`];
+        if (!qData || !qData.section) {
+            avgPerQuarter.push(null);
+            continue;
         }
-    });
-    if (subjectPerformances.length === 0) {
-        container.querySelector('.stats-avg-grade-text').textContent = 'Нет данных для расчета.';
-        return;
+        
+        const subjectsInQ = [];
+        Object.keys(qData.section).forEach(subj => {
+            const p = calculateFinalPercentageForFriend(subj, qData);
+            if (p !== null && p >= 0) {
+                subjectsInQ.push(p);
+                if (!subjectsMap[subj]) subjectsMap[subj] = [null, null, null, null];
+                subjectsMap[subj][q-1] = p;
+            }
+        });
+        
+        if (subjectsInQ.length > 0) {
+            const sum = subjectsInQ.reduce((a, b) => a + b, 0);
+            avgPerQuarter.push(parseFloat((sum / subjectsInQ.length).toFixed(2)));
+        } else {
+            avgPerQuarter.push(null);
+        }
     }
-    const totalGrade = subjectPerformances.reduce((sum, p) => sum + p.grade, 0);
-    const totalPercentage = subjectPerformances.reduce((sum, p) => sum + p.percentage, 0);
-    const averageGrade = totalGrade / subjectPerformances.length;
-    const averagePercentage = totalPercentage / subjectPerformances.length;
-    const bestSubject = subjectPerformances.reduce((best, current) => current.percentage > best.percentage ? current : best, subjectPerformances[0]);
-    const worstSubject = subjectPerformances.reduce((worst, current) => current.percentage < worst.percentage ? current : worst, subjectPerformances[0]);
-    const gaugeElement = container.querySelector('.gauge-fg');
-    const gaugeText = container.querySelector('.gauge-text');
-    const statsAvgText = container.querySelector('.stats-avg-grade-text');
-    const detailsContainer = container.querySelector('.stats-details');
-    statsAvgText.textContent = `Средняя оценка по предметам: ${averageGrade.toFixed(2)}`;
-    gaugeText.textContent = averageGrade.toFixed(2);
-    detailsContainer.innerHTML = `<div class="stat-item"><strong>Средний %:</strong><span>${averagePercentage.toFixed(2)} %</span></div><div class="stat-item"><strong>Лучший предмет:</strong><span>${bestSubject.name} (${bestSubject.percentage.toFixed(2)}%)</span></div><div class="stat-item"><strong>Худший предмет:</strong><span>${worstSubject.name} (${worstSubject.percentage.toFixed(2)}%)</span></div>`;
-    const gaugePathLength = gaugeElement.getTotalLength();
-    gaugeElement.style.strokeDasharray = gaugePathLength;
-    const normalizedValue = Math.max(0, Math.min(1, (averageGrade - 2) / (5 - 2)));
-    const offset = gaugePathLength * (1 - normalizedValue);
-    const hue = normalizedValue * 120;
-    gaugeElement.style.stroke = `hsl(${hue}, 90%, 45%)`;
-    gaugeElement.style.strokeDashoffset = offset;
+
+    container.innerHTML = `
+        <div class="gauge-container"><svg viewBox="0 0 100 50" class="gauge"><path class="gauge-bg" d="M 10 50 A 40 40 0 0 1 90 50"></path><path class="gauge-fg" d="M 10 50 A 40 40 0 0 1 90 50"></path></svg><div class="gauge-text">--</div><div class="gauge-min-max"><span>2</span><span>5</span></div></div><div class="stats-avg-grade-text"></div><div class="stats-details"><div class="stat-item"><strong>Средний %:</strong><span>--</span></div><div class="stat-item"><strong>Лучший предмет:</strong><span>--</span></div><div class="stat-item"><strong>Худший предмет:</strong><span>--</span></div></div>
+        
+        <div class="charts-section" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+            <h4 style="margin-bottom: 20px; text-align: center;">Средний процент по четвертям</h4>
+            <div style="height: 300px; width: 100%; margin-bottom: 30px; position: relative;">
+                <canvas id="${containerId}-year-chart"></canvas>
+            </div>
+            
+            <h4 style="margin-bottom: 20px; text-align: center;">Успеваемость по предметам</h4>
+            <div style="height: 800px; width: 100%; margin-bottom: 30px; position: relative;">
+                <canvas id="${containerId}-subjects-chart"></canvas>
+            </div>
+            
+            <h4 style="margin-bottom: 15px;">Детализация</h4>
+            <div class="table-wrapper">
+                <table style="width: 100%;">
+                    <thead>
+                        <tr><th>Предмет</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Год</th></tr>
+                    </thead>
+                    <tbody id="${containerId}-summary-body"></tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    // --- Gauge Logic (Selected Quarter) ---
+    const quarterData = gradesData[`q${statsQuarter}`];
+    let gaugeRendered = false;
+
+    if (quarterData) {
+        let subjectPerformances = [];
+        Object.keys(quarterData.section || {}).forEach(subject => {
+            const percentage = calculateFinalPercentageForFriend(subject, quarterData);
+            if (percentage !== null && percentage >= 0) {
+                subjectPerformances.push({ name: subject, percentage: percentage, grade: getGradeFromPercentage(percentage) });
+            }
+        });
+        
+        if (subjectPerformances.length > 0) {
+            const totalGrade = subjectPerformances.reduce((sum, p) => sum + p.grade, 0);
+            const totalPercentage = subjectPerformances.reduce((sum, p) => sum + p.percentage, 0);
+            const averageGrade = totalGrade / subjectPerformances.length;
+            const averagePercentage = totalPercentage / subjectPerformances.length;
+            const bestSubject = subjectPerformances.reduce((best, current) => current.percentage > best.percentage ? current : best, subjectPerformances[0]);
+            const worstSubject = subjectPerformances.reduce((worst, current) => current.percentage < worst.percentage ? current : worst, subjectPerformances[0]);
+            
+            const gaugeElement = container.querySelector('.gauge-fg');
+            const gaugeText = container.querySelector('.gauge-text');
+            const statsAvgText = container.querySelector('.stats-avg-grade-text');
+            const detailsContainer = container.querySelector('.stats-details');
+            
+            statsAvgText.textContent = `Средняя оценка по предметам (Q${statsQuarter}): ${averageGrade.toFixed(2)}`;
+            gaugeText.textContent = averageGrade.toFixed(2);
+            detailsContainer.innerHTML = `<div class="stat-item"><strong>Средний %:</strong><span>${averagePercentage.toFixed(2)} %</span></div><div class="stat-item"><strong>Лучший предмет:</strong><span>${bestSubject.name} (${bestSubject.percentage.toFixed(2)}%)</span></div><div class="stat-item"><strong>Худший предмет:</strong><span>${worstSubject.name} (${worstSubject.percentage.toFixed(2)}%)</span></div>`;
+            
+            const gaugePathLength = gaugeElement.getTotalLength();
+            gaugeElement.style.strokeDasharray = gaugePathLength;
+            const normalizedValue = Math.max(0, Math.min(1, (averageGrade - 2) / (5 - 2)));
+            const offset = gaugePathLength * (1 - normalizedValue);
+            const hue = normalizedValue * 120;
+            gaugeElement.style.stroke = `hsl(${hue}, 90%, 45%)`;
+            gaugeElement.style.strokeDashoffset = offset;
+            gaugeRendered = true;
+        }
+    }
+    
+    if (!gaugeRendered) {
+        container.querySelector('.stats-avg-grade-text').textContent = 'Нет данных для расчета показателей за эту четверть.';
+        container.querySelector('.gauge-fg').style.display = 'none';
+        container.querySelector('.gauge-text').textContent = '--';
+    }
+
+    // --- Chart JS Implementation ---
+    window.appCharts = window.appCharts || {};
+    if (window.appCharts[containerId]) {
+        if (window.appCharts[containerId].year) window.appCharts[containerId].year.destroy();
+        if (window.appCharts[containerId].subj) window.appCharts[containerId].subj.destroy();
+    }
+
+    try {
+        const ctxYear = document.getElementById(`${containerId}-year-chart`).getContext('2d');
+        const yearChart = new Chart(ctxYear, {
+            type: 'line',
+            data: {
+                labels: qLabels,
+                datasets: [{
+                    label: 'Средний %',
+                    data: avgPerQuarter,
+                    borderColor: '#2196F3',
+                    backgroundColor: 'rgba(33, 150, 243, 0.2)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                layout: { padding: { left: 5, right: 10, top: 10, bottom: 5 } },
+                scales: { 
+                    y: { 
+                        beginAtZero: true, 
+                        max: 100,
+                        ticks: { font: { size: 10 } }
+                    },
+                    x: {
+                        ticks: { font: { size: 10 } }
+                    }
+                } 
+            }
+        });
+
+        const subjDatasets = [];
+        let cIdx = 0;
+        const summaryBody = document.getElementById(`${containerId}-summary-body`);
+
+        Object.keys(subjectsMap).forEach(subj => {
+            const d = subjectsMap[subj];
+            const hasData = d.some(x => x !== null);
+            if (!hasData) return;
+
+            const vals = d.filter(x => x !== null);
+            const avg = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+            
+            // Generate unique bright color (Golden Angle Distribution)
+            // Saturation 80%, Lightness 45% (vibrant, not dark, legible on white)
+            const hue = (cIdx * 137.508) % 360; 
+            const color = `hsl(${hue}, 80%, 45%)`;
+
+            summaryBody.innerHTML += `<tr>
+                <td style="min-width: 140px; white-space: normal;">${subj}</td>
+                <td>${d[0] !== null ? d[0].toFixed(1) + '%' : '-'}</td>
+                <td>${d[1] !== null ? d[1].toFixed(1) + '%' : '-'}</td>
+                <td>${d[2] !== null ? d[2].toFixed(1) + '%' : '-'}</td>
+                <td>${d[3] !== null ? d[3].toFixed(1) + '%' : '-'}</td>
+                <td><strong>${avg.toFixed(1)}%</strong></td>
+            </tr>`;
+
+            subjDatasets.push({
+                label: subj,
+                data: d,
+                borderColor: color,
+                backgroundColor: color,
+                tension: 0.3,
+                fill: false,
+                borderWidth: 2,
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                pointHoverBorderWidth: 3
+            });
+            cIdx++;
+        });
+
+        const ctxSubj = document.getElementById(`${containerId}-subjects-chart`).getContext('2d');
+        const subjChart = new Chart(ctxSubj, {
+            type: 'line',
+            data: { labels: qLabels, datasets: subjDatasets },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                layout: { padding: { left: 5, right: 10, top: 10, bottom: 5 } },
+                scales: { 
+                    y: { 
+                        beginAtZero: true, 
+                        max: 100,
+                        ticks: { font: { size: 10 } }
+                    },
+                    x: {
+                        ticks: { font: { size: 10 } }
+                    }
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: { 
+                    legend: { 
+                        position: 'bottom', 
+                        labels: { 
+                            boxWidth: 10,
+                            usePointStyle: true,
+                            padding: 15
+                        },
+                        onClick: function(e, legendItem, legend) {
+                            const index = legendItem.datasetIndex;
+                            const ci = legend.chart;
+                            let alreadyHidden = ci.getDatasetMeta(index).hidden === true;
+                            let othersHidden = true;
+                            
+                            // Check if everyone else is currently hidden
+                            for (let i = 0; i < ci.data.datasets.length; i++) {
+                                if (i !== index && ci.getDatasetMeta(i).hidden !== true) {
+                                    othersHidden = false;
+                                    break;
+                                }
+                            }
+                            
+                            // Logic:
+                            // 1. If currently showing ALL (othersHidden = false): Isolate clicked
+                            // 2. If currently Isoling THIS (othersHidden = true): Show ALL
+                            // 3. If currently Isoling ANOTHER: Isolate THIS (othersHidden is true, but checks need to be careful)
+                             
+                            // Simpler check:
+                            // Is this the ONLY visible one?
+                            let isOnlyThisVisible = !ci.getDatasetMeta(index).hidden;
+                            for (let i = 0; i < ci.data.datasets.length; i++) {
+                                if (i !== index && !ci.getDatasetMeta(i).hidden) {
+                                    isOnlyThisVisible = false;
+                                    break;
+                                }
+                            }
+
+                            if (isOnlyThisVisible) {
+                                // Restore All
+                                ci.data.datasets.forEach((ds, i) => {
+                                    ci.getDatasetMeta(i).hidden = false;
+                                });
+                            } else {
+                                // Isolate This One
+                                ci.data.datasets.forEach((ds, i) => {
+                                    ci.getDatasetMeta(i).hidden = i !== index;
+                                });
+                            }
+                            ci.update();
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        usePointStyle: true,
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        titleColor: '#000',
+                        bodyColor: '#000',
+                        borderColor: '#ddd',
+                        borderWidth: 1
+                    },
+                    tooltipItem: {
+                        boxPadding: 4
+                    }
+                },
+                hover: {
+                    mode: 'nearest',
+                    intersect: true
+                },
+                onHover: (event, chartElement) => {
+                    const chart = event.chart;
+                    if (chartElement.length) {
+                        const activeIndex = chartElement[0].datasetIndex;
+                        chart.data.datasets.forEach((d, i) => {
+                            if (i === activeIndex) {
+                                d.backgroundColor = d.borderColor; 
+                            } else {
+                                // Instead of transparency, we can just not highlight them or keep them normal
+                                // Since user complained about "responsiveness", simpler is better.
+                                // But if we want to retain the 'focus' feature without lag:
+                                // d.backgroundColor = d.borderColor.replace('hsl', 'hsla').replace(')', ', 0.2)'); 
+                                // Actually, managing HSL strings is tricky. Let's JUST use pointer change.
+                            }
+                        });
+                    }
+                    event.native.target.style.cursor = chartElement.length ? 'pointer' : 'default';
+                }
+            }
+        });
+
+        // Add Toggle All Button Logic
+        const toggleBtnId = `${containerId}-toggle-btn`;
+        const chartContainer = document.getElementById(`${containerId}-subjects-chart`).parentElement;
+        if (!document.getElementById(toggleBtnId)) {
+            const btn = document.createElement('button');
+            btn.id = toggleBtnId;
+            btn.className = 'button secondary small';
+            btn.style.marginBottom = '10px';
+            btn.textContent = 'Скрыть/Показать все';
+            btn.onclick = () => {
+                const chart = window.appCharts[containerId].subj;
+                const allHidden = chart.data.datasets.every(ds => ds.hidden);
+                chart.data.datasets.forEach(ds => { ds.hidden = !allHidden; });
+                chart.update();
+            };
+            chartContainer.parentNode.insertBefore(btn, chartContainer);
+        }
+
+        window.appCharts[containerId] = { year: yearChart, subj: subjChart };
+    } catch (e) {
+        console.error("Chart load error:", e);
+        container.querySelector('.charts-section').innerHTML += '<p style="color:red; text-align:center;">Ошибка отображения графиков. Попробуйте обновить страницу.</p>';
+    }
 }
 function renderProfileDashboard() {
     renderStatisticsView('profile-stats-container', { q1: allGradesData.q1, q2: allGradesData.q2, q3: allGradesData.q3, q4: allGradesData.q4 });
@@ -817,28 +1274,90 @@ function renderMainContent() {
     const contentDisplay = document.getElementById('content-display');
     const dataForQuarter = allGradesData[`q${currentQuarter}`];
     if (!dataForQuarter) { contentDisplay.innerHTML = `<div class="no-data-message">Данные для этой четверти еще не созданы.</div>`; return; }
-    const data = dataForQuarter[currentTabId]?.[currentSubject];
-    let tableHTML = `<div class="table-wrapper"><table><thead><tr><th></th><th>Наименование</th><th>Результат</th><th>Максимум</th></tr></thead><tbody>`;
-    if (!data || data.length === 0) { contentDisplay.innerHTML = `<div class="no-data-message">Данные отсутствуют.</div>`; return; }
+    
+    // Ensure array exists
+    if (!dataForQuarter[currentTabId]) dataForQuarter[currentTabId] = {};
+    if (!dataForQuarter[currentTabId][currentSubject]) dataForQuarter[currentTabId][currentSubject] = [];
+    
+    const data = dataForQuarter[currentTabId][currentSubject];
+    let tableHTML = `<div class="table-wrapper"><table class="edit-grades-table"><thead><tr><th style="width: 40px;"></th><th>Наименование</th><th style="width: 70px; text-align: center;">Результат</th><th style="width: 70px; text-align: center;">Максимум</th><th style="width: 60px;">Действия</th></tr></thead><tbody>`;
 
-    data.forEach((item, index) => {
-        const resultValue = (item.userResult !== null && item.userResult !== undefined && item.userResult !== '') ? item.userResult : '';
-        tableHTML += `
-            <tr>
-                <td>${index + 1}</td>
-                <td>${item.name}</td>
-                <td><input type="text" value="${resultValue}" data-subject="${currentSubject}" data-tab="${currentTabId}" data-index="${index}"></td>
-                <td><input type="number" class="max-score-input" value="${item.max}" data-subject="${currentSubject}" data-tab="${currentTabId}" data-index="${index}"></td>
-            </tr>`;
-    });
+    if (data.length > 0) {
+        data.forEach((item, index) => {
+            const resultValue = (item.userResult !== null && item.userResult !== undefined && item.userResult !== '') ? item.userResult : '';
+            tableHTML += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td><input type="text" value="${item.name}" class="task-name-input" data-subject="${currentSubject}" data-tab="${currentTabId}" data-index="${index}"></td>
+                    <td><input type="text" value="${resultValue}" data-subject="${currentSubject}" data-tab="${currentTabId}" data-index="${index}"></td>
+                    <td><input type="number" class="max-score-input" value="${item.max}" data-subject="${currentSubject}" data-tab="${currentTabId}" data-index="${index}"></td>
+                    <td><button class="icon-btn delete-task-btn" data-subject="${currentSubject}" data-tab="${currentTabId}" data-index="${index}" title="Удалить"><svg style="width:16px;height:16px;fill:currentColor;" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button></td>
+                </tr>`;
+        });
+    } else {
+        tableHTML += `<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Нет заданий. Нажмите "Добавить", чтобы создать.</td></tr>`;
+    }
 
     tableHTML += `</tbody></table></div>`;
+    
+    const addButtonText = currentTabId === 'section' ? 'Добавить СОР' : 'Добавить СОЧ';
+    tableHTML += `
+        <div class="task-actions" style="margin-top: 15px; display: flex; gap: 10px;">
+            <button id="add-task-btn" class="button secondary small">
+                <svg style="width:16px;height:16px;margin-right:5px;fill:currentColor;" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                ${addButtonText}
+            </button>
+        </div>
+    `;
+
     contentDisplay.innerHTML = tableHTML;
-    contentDisplay.querySelectorAll('input[type="text"]').forEach(input => {
+    
+    // Attach event listeners
+    contentDisplay.querySelectorAll('input[type="text"]:not(.task-name-input)').forEach(input => {
         input.addEventListener('change', handleInputChange);
+    });
+    // Name change handler
+    contentDisplay.querySelectorAll('.task-name-input').forEach(input => {
+        input.addEventListener('change', (e) => {
+            const subject = e.target.dataset.subject;
+            const tab = e.target.dataset.tab;
+            const index = e.target.dataset.index;
+            allGradesData[`q${currentQuarter}`][tab][subject][index].name = e.target.value;
+            saveData();
+        });
     });
     contentDisplay.querySelectorAll('.max-score-input').forEach(input => {
         input.addEventListener('change', handleMaxScoreChange);
+    });
+    
+    // Delete buttons
+    contentDisplay.querySelectorAll('.delete-task-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const btnEl = e.currentTarget; // use currentTarget to get the button element even if svg is clicked
+            const subject = btnEl.dataset.subject;
+            const tab = btnEl.dataset.tab;
+            const index = parseInt(btnEl.dataset.index, 10);
+            
+            if(confirm('Удалить эту работу?')) {
+                allGradesData[`q${currentQuarter}`][tab][subject].splice(index, 1);
+                calculateAndUpdateSubject(subject);
+                saveData();
+                renderMainContent();
+            }
+        });
+    });
+
+    // Add button
+    document.getElementById('add-task-btn').addEventListener('click', () => {
+        const newTask = {
+            name: "Новая работа",
+            max: 10,
+            userResult: ""
+        };
+        allGradesData[`q${currentQuarter}`][currentTabId][currentSubject].push(newTask);
+        calculateAndUpdateSubject(currentSubject);
+        saveData();
+        renderMainContent();
     });
 }
 function renderSidebar() {
@@ -883,22 +1402,32 @@ function renderFriendData(friendData, container, friendUid = null) {
             </div>
             ${uid ? `<button class="button" onclick="openCompareModal('${uid}', '${friendProfile.username}')" style="margin-left: auto;">Сравнить</button>` : ''}
         </div>
-        <div class="friend-data-section">
-            <h4>Статистика</h4>
-            <div class="quarter-selector" id="friend-stats-q-selector"><button class="q-btn active" data-quarter="1">1</button><button class="q-btn" data-quarter="2">2</button><button class="q-btn" data-quarter="3">3</button><button class="q-btn" data-quarter="4">4</button></div>
-            <div id="friend-stats-results-container" class="stats-container" style="box-shadow: none; border: none; padding: 0;"></div>
+
+        <div class="tabs profile-view-tabs" style="margin-bottom: 20px;">
+            <div class="tab active" data-view="grades">Оценки</div>
+            <div class="tab" data-view="stats">Статистика</div>
         </div>
-        <div class="friend-data-section">
-            <h4>Оценки</h4>
-            <div class="content-card wide" style="box-shadow: none; border: none; padding: 0;">
-                <div class="sidebar table-wrapper"><table><thead><tr><th></th><th>Предмет</th><th>Общий %</th><th>Оценка</th></tr></thead><tbody id="friend-sidebar-body"></tbody></table></div>
-                <div class="main-content">
-                    <div class="quarter-selector" id="friend-grades-q-selector"><button class="q-btn active" data-quarter="1">1</button><button class="q-btn" data-quarter="2">2</button><button class="q-btn" data-quarter="3">3</button><button class="q-btn" data-quarter="4">4</button></div>
-                    <div class="tabs" id="friend-tabs"><div class="tab active" data-tab-id="section">СОР</div><div class="tab" data-tab-id="quarter">СОЧ</div></div>
-                    <div id="friend-content-display"></div>
+
+        <div id="friend-view-grades" class="friend-view-content">
+            <div class="friend-data-section">
+                <div class="content-card wide" style="box-shadow: none; border: none; padding: 0;">
+                    <div class="sidebar table-wrapper"><table><thead><tr><th></th><th>Предмет</th><th>Общий %</th><th>Оценка</th></tr></thead><tbody id="friend-sidebar-body"></tbody></table></div>
+                    <div class="main-content">
+                        <div class="quarter-selector" id="friend-grades-q-selector"><button class="q-btn active" data-quarter="1">1</button><button class="q-btn" data-quarter="2">2</button><button class="q-btn" data-quarter="3">3</button><button class="q-btn" data-quarter="4">4</button></div>
+                        <div class="tabs" id="friend-tabs"><div class="tab active" data-tab-id="section">СОР</div><div class="tab" data-tab-id="quarter">СОЧ</div></div>
+                        <div id="friend-content-display"></div>
+                    </div>
                 </div>
             </div>
+        </div>
+
+        <div id="friend-view-stats" class="friend-view-content hidden">
+            <div class="friend-data-section">
+                <div class="quarter-selector" id="friend-stats-q-selector"><button class="q-btn active" data-quarter="1">1</button><button class="q-btn" data-quarter="2">2</button><button class="q-btn" data-quarter="3">3</button><button class="q-btn" data-quarter="4">4</button></div>
+                <div id="friend-stats-results-container" class="stats-container" style="box-shadow: none; border: none; padding: 0;"></div>
+            </div>
         </div>`;
+
     let fq = 1, ft = 'section', fs = "Английский язык";
     const friendStatsQSelector = document.getElementById('friend-stats-q-selector'); const friendGradesQSelector = document.getElementById('friend-grades-q-selector'); const friendTabs = document.getElementById('friend-tabs');
     const renderFriendGradesView = () => { const sb = document.getElementById('friend-sidebar-body'); const cd = document.getElementById('friend-content-display'); const qd = friendGrades[`q${fq}`] || getNewQuarterData(); sb.innerHTML = ''; Object.keys(qd.section).forEach((s, i) => { const p = calculateFinalPercentageForFriend(s, qd); const g = getGradeFromPercentage(p); const r = document.createElement('tr'); r.dataset.subject = s; r.innerHTML = `<td>${i + 1}</td><td>${s}</td><td class="subject-percentage">${(p !== null && p >= 0) ? p.toFixed(2) + ' %' : '-- %'}</td><td class="subject-grade">${(p !== null && p >= 0) ? g : '-'}</td>`; if (s === fs) r.classList.add('selected'); sb.appendChild(r); }); const d = qd[ft]?.[fs]; let th = `<div class="table-wrapper"><table><thead><tr><th></th><th>Наименование</th><th>Результат</th><th>Максимум</th></tr></thead><tbody>`; if (d && d.length > 0) { d.forEach((i, x) => { th += `<tr><td>${x + 1}</td><td>${i.name}</td><td class="readonly-result">${i.userResult || '-'}</td><td class="max-col">${i.max}</td></tr>`; }); } th += `</tbody></table></div>`; cd.innerHTML = th; sb.querySelectorAll('tr').forEach(r => r.addEventListener('click', function () { fs = this.dataset.subject; renderFriendGradesView(); })); };
@@ -906,6 +1435,25 @@ function renderFriendData(friendData, container, friendUid = null) {
     const handleFriendQSelector = (e) => { if (e.target.classList.contains('q-btn')) { fq = parseInt(e.target.dataset.quarter, 10); friendStatsQSelector.querySelector('.active').classList.remove('active'); friendGradesQSelector.querySelector('.active').classList.remove('active'); friendStatsQSelector.children[fq - 1].classList.add('active'); friendGradesQSelector.children[fq - 1].classList.add('active'); renderFriendDataViews(); } };
     friendStatsQSelector.addEventListener('click', handleFriendQSelector); friendGradesQSelector.addEventListener('click', handleFriendQSelector);
     friendTabs.addEventListener('click', e => { if (e.target.classList.contains('tab')) { friendTabs.querySelector('.active').classList.remove('active'); e.target.classList.add('active'); ft = e.target.dataset.tabId; renderFriendGradesView(); } });
+    
+    // View tabs switching logic
+    container.querySelectorAll('.profile-view-tabs .tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+             container.querySelectorAll('.profile-view-tabs .tab').forEach(t => t.classList.remove('active'));
+             tab.classList.add('active');
+             const view = tab.dataset.view;
+             if(view === 'grades') {
+                 document.getElementById('friend-view-grades').classList.remove('hidden');
+                 document.getElementById('friend-view-stats').classList.add('hidden');
+             } else {
+                 document.getElementById('friend-view-grades').classList.add('hidden');
+                 document.getElementById('friend-view-stats').classList.remove('hidden');
+                 // Re-render statistics to fix chart scaling issues when unhiding
+                 renderFriendDataViews();
+             }
+        });
+    });
+
     renderFriendDataViews();
 }
 
@@ -1161,11 +1709,9 @@ function calculateEGR(gradesData, selectedQuarter = null) {
         const subjects = Object.keys(quarterData.section || {}).concat(Object.keys(quarterData.quarter || {}));
         const uniqueSubjects = [...new Set(subjects)];
         uniqueSubjects.forEach(subject => {
-            if (isSubjectCompleteInQuarter(quarterData, subject)) {
-                const perc = calculateFinalPercentageForFriend(subject, quarterData);
-                if (perc !== null && !isNaN(perc)) {
-                    total += Math.round(perc);
-                }
+            const perc = calculateFinalPercentageForFriend(subject, quarterData);
+            if (perc !== null && !isNaN(perc)) {
+                total += Math.round(perc);
             }
         });
     } else {
@@ -1176,11 +1722,9 @@ function calculateEGR(gradesData, selectedQuarter = null) {
             const subjects = Object.keys(quarterData.section || {}).concat(Object.keys(quarterData.quarter || {}));
             const uniqueSubjects = [...new Set(subjects)];
             uniqueSubjects.forEach(subject => {
-                if (isSubjectCompleteInQuarter(quarterData, subject)) {
-                    const perc = calculateFinalPercentageForFriend(subject, quarterData);
-                    if (perc !== null && !isNaN(perc)) {
-                        total += Math.round(perc);
-                    }
+                const perc = calculateFinalPercentageForFriend(subject, quarterData);
+                if (perc !== null && !isNaN(perc)) {
+                    total += Math.round(perc);
                 }
             });
         });
@@ -1329,8 +1873,8 @@ function setupPostsListener(postsPath, container) {
             let viewCounterHtml = '';
             if (currentUser && (post.uid === currentUser.uid || userProfile.isAdmin)) {
                 viewCounterHtml = `
-                    <div class="view-counter action-btn">
-                        <svg viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z"/></svg>
+                    <div class="view-counter action-btn" title="Просмотры">
+                        <svg width="20" height="20" viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z"/></svg>
                         <span>${viewCount}</span>
                     </div>`;
             }
@@ -1349,14 +1893,14 @@ function setupPostsListener(postsPath, container) {
 
                     repliesHtml += `
                         <div class="reply-card">
-                            <img src="${reply.authorPhotoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" class="reply-avatar">
+                            <img src="${reply.authorPhotoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" class="reply-avatar" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
                             <div class="reply-content">
                                 ${replyDeleteBtnHtml}
                                 <span class="reply-author">${reply.username} ${replyPrefixesHtml}</span>
                                 <p class="reply-text">${reply.text}</p>
                                 <div class="reply-actions">
                                      <button class="reply-like-btn action-btn ${isReplyLiked ? 'liked' : ''}" data-post-id="${post.id}" data-reply-id="${replyId}">
-                                        <svg viewBox="0 0 24 24"><path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"></path></svg>
+                                        <svg width="18" height="18" viewBox="0 0 24 24"><path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"></path></svg>
                                         <span>${replyLikeCount}</span>
                                     </button>
                                 </div>
@@ -1380,7 +1924,7 @@ function setupPostsListener(postsPath, container) {
                 <div class="post-card">
                     ${deleteButtonHtml}
                     <div class="post-header">
-                        <img src="${post.authorPhotoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" class="post-avatar">
+                        <img src="${post.authorPhotoURL || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" class="post-avatar" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
                         <div class="post-author-info">
                             ${authorHtml}
                             <span class="post-timestamp">${formatTimestamp(post.timestamp)}</span>
@@ -1390,11 +1934,11 @@ function setupPostsListener(postsPath, container) {
                     ${postImageHtml}
                     <div class="post-actions">
                         <button class="like-btn action-btn ${isLikedByCurrentUser ? 'liked' : ''}" data-post-id="${post.id}">
-                            <svg viewBox="0 0 24 24"><path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"></path></svg>
+                            <svg width="20" height="20" viewBox="0 0 24 24"><path d="M12,21.35L10.55,20.03C5.4,15.36 2,12.27 2,8.5C2,5.41 4.42,3 7.5,3C9.24,3 10.91,3.81 12,5.08C13.09,3.81 14.76,3 16.5,3C19.58,3 22,5.41 22,8.5C22,12.27 18.6,15.36 13.45,20.03L12,21.35Z"></path></svg>
                             <span>${likeCount}</span>
                         </button>
                         <button class="reply-toggle-btn action-btn" data-post-id="${post.id}">
-                             <svg viewBox="0 0 24 24"><path d="M9,22A1,1 0 0,1 8,21V18H4A2,2 0 0,1 2,16V4C2,2.89 2.9,2 4,2H20A2,2 0 0,1 22,4V16A2,2 0 0,1 20,18H13.9L10.2,21.71C10,21.9 9.75,22 9.5,22V22H9Z" /></svg>
+                             <svg width="20" height="20" viewBox="0 0 24 24"><path d="M9,22A1,1 0 0,1 8,21V18H4A2,2 0 0,1 2,16V4C2,2.89 2.9,2 4,2H20A2,2 0 0,1 22,4V16A2,2 0 0,1 20,18H13.9L10.2,21.71C10,21.9 9.75,22 9.5,22V22H9Z" /></svg>
                              <span>${replyCount}</span>
                         </button>
                         ${viewCounterHtml}
@@ -1972,9 +2516,21 @@ function renderAdminGradesForQuarter(uid, quarter) {
     let quarterData = userGrades[`q${quarter}`];
 
     if (!quarterData) {
-        quarterData = getNewQuarterData();
+        quarterData = getNewQuarterData(quarter);
         if (!allUsersDataCache[uid].grades) allUsersDataCache[uid].grades = {};
         allUsersDataCache[uid].grades[`q${quarter}`] = quarterData;
+    } else if (quarter === 2) {
+        // Fix for outdated Q2 data in admin view
+        let needsUpdate = false;
+        if (quarterData.section['Биология'] && quarterData.section['Биология'].some(t => t.name.includes("7.1A"))) needsUpdate = true;
+        if (!needsUpdate && quarterData.section['География'] && quarterData.section['География'].some(t => t.name.includes("Географиялык"))) needsUpdate = true;
+        
+        if (needsUpdate) {
+            quarterData = getNewQuarterData(2);
+            allUsersDataCache[uid].grades['q2'] = quarterData;
+            // Note: we don't save to DB immediately here, only when Admin clicks Save.
+            // But this ensures Admin sees the new structure.
+        }
     }
 
     const sidebarBody = document.getElementById(`admin-sidebar-body-${uid}`);
@@ -2143,7 +2699,7 @@ async function renderAdminPostsTab() {
             postsHtml += `
                 <div class="admin-post-card" id="admin-post-${post.id}">
                     <div class="post-header">
-                         <img src="${authorPhoto || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" class="post-avatar">
+                         <img src="${authorPhoto || 'https://ssl.gstatic.com/images/branding/product/1x/avatar_circle_blue_512dp.png'}" class="post-avatar" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
                          <div class="post-author-info">
                             ${authorInfo}
                             <span class="post-timestamp">${formatTimestamp(post.timestamp)}</span>
@@ -2706,7 +3262,7 @@ function renderCompareView(user1Data, user2Data, quarter) {
     });
 }
 
-// --- NAV INDICATOR HELPERS ---
+
 let navIndicatorPrevX = 0;
 function setupNavIndicator() {
     const nav = document.querySelector('.main-nav');
